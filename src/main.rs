@@ -8,23 +8,20 @@ fn main() -> ! {
     let dp = arduino_hal::Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(dp);
 
-    let mut leds = [
-        pins.led_rx.into_output().downgrade(),
-        pins.led_tx.into_output().downgrade(),
-        pins.d13.into_output().downgrade(),
-    ];
+    /*
+     * For examples (and inspiration), head to
+     *
+     *     https://github.com/Rahix/avr-hal/tree/main/examples
+     *
+     * NOTE: Not all examples were ported to all boards!  There is a good chance though, that code
+     * for a different board can be adapted for yours.  The Arduino Uno currently has the most
+     * examples available.
+     */
 
-    // RX & TX LEDs are active low and the LED on D13 is active high.  Thus invert LED13 here so
-    // they are all in the same "state":
-    leds[0].set_high();
-    leds[1].set_high();
-    leds[2].set_low();
+    let mut led = pins.d13.into_output();
 
     loop {
-        for i in 0..3 {
-            leds[i].toggle();
-            arduino_hal::delay_ms(100);
-            leds[i].toggle();
-        }
+        led.toggle();
+        arduino_hal::delay_ms(1000);
     }
 }
