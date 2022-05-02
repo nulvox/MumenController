@@ -20,6 +20,7 @@ static MASK_R2: u16 0x0080
 static MASK_SELECT: u16 0x0100
 static MASK_START: u16 0x0200
 static MASK_HOME: u16 0x1000
+static MASK_NONE: u16 0x0000
 
 // Dpad Hat switch state masks
 static PAD_MASK_UP: u16 0x0000
@@ -70,6 +71,7 @@ fn checkModeChange (&mut mode: InputMode, &mut changed: bool) {
     }
 }
 
+// Define your pinout here
 fn definePins(&mut pins: arduino_hal::gpio::Pins) {
     // Return a struct with named objects
     return enum {
@@ -232,15 +234,76 @@ fn processDpad(& pins: arduino_hal::gpio::Pins) {
     }
 }
 
-fn processButtons(& pins: arduino_hal::gpio::Pins) {
-    // learn to read buttons... for all of this
+fn buttonRead(& pins: arduino_hal::gpio::Pins, mode: InputMode) {
+    // define the report enum
+    buttonstate = enum {
+        buttons = MASK_NONE,
+        hat = PAD_MASK_NONE,
+    }
 
-}
-
-fn buttonRead(& pins: arduino_hal::gpio::Pins) {
+    match mode {
+        InputMode::Smash => processSmash(pins),
+        InputMode::Analog => processAnalog(pins),
+        InputMode::Dpad => processDpad(pins),
+    }
     // read buttons
     // if button is pressed, set the bit
     // if button is released, clear the bit
+    if pins.debouncea.is_high() {
+        buttonstate.buttons |= MASK_A;
+    } else {
+        buttons.clear(debouncea);
+    }
+    if pins.debounceb.is_high() {
+        buttonstate.buttons |= MASK_B;
+    } else {
+        buttons.clear(debounceb);
+    }
+    if pins.debouncex.is_high() {
+        buttonstate.buttons |= MASK_X;
+    } else {
+        buttons.clear(debouncex);
+    }
+    if pins.debouncey.is_high() {
+        buttonstate.buttons |= MASK_Y;
+    } else {
+        buttons.clear(debouncey);
+    }
+    if pins.deboucer1.is_high() {
+        buttonstate.buttons |= MASK_R1;
+    } else {
+        buttons.clear(deboucer1);
+    }
+    if pins.debouncer2.is_high() {
+        buttonstate.buttons |= MASK_R2;
+    } else {
+        buttons.clear(debouncer2);
+    }
+    if pins.deboucel1.is_high() {
+        buttonstate.buttons |= MASK_L1;
+    } else {
+        buttons.clear(deboucel1);
+    }
+    if pins.deboucel2.is_high() {
+        buttonstate.buttons |= MASK_L2;
+    } else {
+        buttons.clear(deboucel2);
+    }
+    if pins.debouncehome.is_high() {
+        buttonstate.buttons |= MASK_HOME;
+    } else {
+        buttons.clear(debouncehome);
+    }
+    if pins.debounceselect.is_high() {
+        buttonstate.buttons |= MASK_SELECT;
+    } else {
+        buttons.clear(debounceselect);
+    }
+    if pins.debouncestart.is_high() {
+        buttonstate.buttons |= MASK_START;
+    } else {
+        buttons.clear(debouncestart);
+    }
 }
 
 #[arduino_hal::entry]
@@ -301,13 +364,9 @@ fn main() -> ! {
             DEBOUNCER.poll()?;
         }
         // Read what is pressed
-        let mut buttonstate = buttonRead(debouncebuttons);
-        // Update input mode if requested
-        let mode = checkModeChange(&buttonstate);
-        // Process the input
-        let reportdata = processButtons(&buttonstate, mode);
+        let mut buttonstate = buttonRead(debouncebuttons, mut &mode);
         // Update the USB HID report
-        let HIDreport = HID_Task(&reportdata);
+        let HIDreport = HID_Task(&buttonstate);
         // Ship the USB HID report
         USB_USBTask(&HIDReport);
     }
