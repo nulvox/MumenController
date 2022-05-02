@@ -17,6 +17,7 @@ nb = "0.1.2"
 embedded-hal = "0.2.3"
 usb-device = "0.2.3"
 usbd-hid-device = "0.1.0"
+unflappable = "0.1"
 
 [dependencies.arduino-hal]
 git = "https://github.com/rahix/avr-hal"
