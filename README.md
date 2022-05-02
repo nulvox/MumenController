@@ -25,6 +25,6 @@ install [rustup ](https://rustup.rs/)
 
 [usb-hid-device](https://github.com/agalakhov/usbd-hid-device) wildly accelerated the time it took to learn HID reporting and provides a clean API to work with HID descriptors. I appreciate your work, agalakhov.
 
-[Unflappable](https://github.com/couchand/unflappable) provide nice portable debounced pin objects. It would be nice to have the functionality it needs available in the stable rust. Keep up the great work, couchand.
+[Unflappable](https://github.com/couchand/unflappable) provides nice portable debounced pin objects. It would be nice to have the functionality it needs available in the stable rust. Keep up the great work, couchand.
 
 I'd also like to thank the Embedded Rust community as a whole. I stand on the shoulders of giants. Check out [Awesome Embedded Rust](https://github.com/rust-embedded/awesome-embedded-rust) for more great projects to follow.
