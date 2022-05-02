@@ -16,7 +16,7 @@ pub struct UsbReport {
     //bytes: [u8; 4],
 }
 
-impl MouseReport {
+impl PadReport {
     pub fn new(button: bool, x: i8, y: i8) -> Self {
         let btn = if button { 0x01 } else { 0x00 };
         MouseReport { 
@@ -33,35 +33,50 @@ impl AsRef<[u8]> for MouseReport {
 
 impl HidReport for MouseReport {
     const DESCRIPTOR: &'static [u8] = &[
-        0x05, 0x01,     // USAGE_PAGE Generic Desktop
-        0x09, 0x02,     // USAGE Mouse
-        0xa1, 0x01,     // COLLECTION Application
-            0x09, 0x01,     // USAGE Pointer
-            0xa1, 0x00,     // COLLECTION Physical
-
-                0x05, 0x09,     // USAGE_PAGE Button
-                0x19, 0x01,     // USAGE_MINIMUM Button 1
-                0x29, 0x03,     // USAGE_MAXIMUM Button 3
-                0x15, 0x00,     // LOGICAL_MINIMUM 0
-                0x25, 0x01,     // LOGICAL_MAXIMUM 1
-                0x95, 0x03,     // REPORT_COUNT 3
-                0x75, 0x01,     // REPORT_SIZE 1
-                0x81, 0x02,     // INPUT Data,Var,Abs
-                0x95, 0x01,     // REPORT_COUNT 1
-                0x75, 0x05,     // REPORT_SIZE 5
-                0x81, 0x01,     // INPUT Cnst,Ary,Abs
-
-                0x05, 0x01,     // USAGE_PAGE Generic Desktop
-                0x09, 0x30,     // USAGE X
-                0x09, 0x31,     // USAGE Y
-                0x09, 0x38,     // USAGE Wheel
-                0x15, 0x81,     // LOGICAL_MINIMUM -127
-                0x25, 0x7f,     // LOGICAL_MAXIMUM 127
-                0x75, 0x08,     // REPORT_SIZE 8
-                0x95, 0x03,     // REPORT_COUNT 3
-                0x81, 0x06,     // INPUT Data,Var,Rel
-
-            0xc0,           // END COLLECTION
-        0xc0,           // END COLLECTION
+        8, 1,                   // USAGE_PAGE Generic Desktop
+        8, 5,                   // USAGE Mouse
+        8, 1,                   // COLLECTION Application
+            8, 0,               // Logical Min
+            8, 1,               // Logical Max
+            8, 0,               // Physical Min
+            8, 1,               // Physical Max
+            8, 1,               // REPORT_SIZE 1
+            8, 16,              // REPORT_COUNT 16
+            8, 9,               // USAGE PAGE
+            8, 1,               // USAGE Min
+            8, 16,              // USAGE Max
+            8, 2,               // INPUT
+            // Hat switch, 1 nibble with a spare nibble
+            8, 1,               // USAGE Page
+            8, 7,               // LOGICAL Max
+            16, 315,            // PHYSICAL Max
+            8, 4,               // REPORT_SIZE
+            8, 1,               // REPORT_COUNT
+            8, 20,              // UNIT
+            8, 57,              // USAGE
+            8, 66,              // INPUT
+            // this is where the spare nibble goes
+            8, 0,               // UNIT
+            8, 1,               // REPORT_COUNT
+            8, 1,               // INPUT
+            16, 255,            // LOGICAL Max
+            16, 255,            // PHYSICAL Max
+            8, 48,              // USAGE
+            8, 49,              // USAGE
+            8, 50,              // USAGE
+            8, 53,              // USAGE
+            8, 8,               // REPORT SIZE
+            8, 4,               // REPORT COUNT
+            8, 2,               // INPUT
+            // vendor specific byte
+            16, 65280,          // USAGE PAGE
+            8, 32,              // USAGE
+            8, 1,               // REPORT COUNT
+            8, 2,               // INPUT
+            // Output, 8 bytes
+            16, 9761,           // USAGE
+            8, 8,               // REPORT COUNT
+            8, 2,               // OUTPUT
+        0 // END COLLECTION
     ];
 }
