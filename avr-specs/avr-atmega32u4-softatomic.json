@@ -14,8 +14,8 @@
   "linker": "avr-gcc",
   "linker-is-gnu": true,
   "llvm-target": "avr-unknown-unknown",
-  "max-atomic-width": 8,
-  "no-default-libraries": false,
+  "max-atomic-width": 16,
+  "no-default-libraries": true,
   "pre-link-args": {
     "gcc": [
       "-mmcu=atmega32u4",
