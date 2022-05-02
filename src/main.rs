@@ -3,6 +3,7 @@
 
 use unflappable::{debouncer_uninit, Debouncer, default::ActiveLow};
 use panic_halt as _;
+mod report;
 
 // Initialize the debouncer
 static DEBOUNCER: Debouncer<PinType, ActiveLow> = debouncer_uninit!();
@@ -94,21 +95,141 @@ fn definePins(&mut pins: arduino_hal::gpio::Pins) {
 }
 
 fn processSmash(& pins: arduino_hal::gpio::Pins) {
-    let mut report = PAD_MASK_NONE;
+    // Analog modes don't change the dpad state
+    let mut stickreport = struct {
+        hat = PAD_MASK_NONE,
+        lx = 128,
+        ly = 128,
+        rx = 128,
+        ry = 128,
+    };
     // Treat the directions as analog input
     // shift makes half values
+    if buttons.pressed(debounceshift) {
+        if buttons.pressed(debounceup) {
+            stickreport.ly = 192;
+        } else if buttons.pressed(debouncedown) {
+            stickreport.ly = 64;
+        }
+        if buttons.pressed(debounceleft) {
+            stickreport.lx = 64;
+        } else if buttons.pressed(debounceright) {
+            stickreport.lx = 192;
+        }
+    } else { // report max values for axies
+        if buttons.pressed(debounceup) {
+            stickreport.ly = 255;
+        } else if buttons.pressed(debouncedown) {
+            stickreport.ly = 0;
+        }
+        if buttons.pressed(debounceleft) {
+            stickreport.lx = 0;
+        } else if buttons.pressed(debounceright) {
+            stickreport.lx = 255;
+        }
+    }
 }
 
 fn processAnalog(& pins: arduino_hal::gpio::Pins) {
-    let mut report = PAD_MASK_NONE;
+    // Analog modes don't change the dpad state
+    let mut stickreport = struct {
+        hat = PAD_MASK_NONE,
+        lx = 128,
+        ly = 128,
+        rx = 128,
+        ry = 128,
+    };
     // Treat the directions as analog input
     // shift makes the input register right stick
+    if buttons.pressed(debounceshift) {
+        if buttons.pressed(debounceup) {
+            stickreport.ry = 255;
+        } else if buttons.pressed(debouncedown) {
+            stickreport.ry = 0;
+        }
+        if buttons.pressed(debounceleft) {
+            stickreport.rx = 0;
+        } else if buttons.pressed(debounceright) {
+            stickreport.rx = 255;
+        }
+    } else {
+        if buttons.pressed(debounceup) {
+            stickreport.ly = 255;
+        } else if buttons.pressed(debouncedown) {
+            stickreport.ly = 0;
+        }
+        if buttons.pressed(debounceleft) {
+            stickreport.lx = 0;
+        } else if buttons.pressed(debounceright) {
+            stickreport.lx = 255;
+        }
+    }
 }
 
 fn processDpad(& pins: arduino_hal::gpio::Pins) {
-    let mut report = PAD_MASK_NONE;
+    // Dpad modes don't change the analog state
+    let mut stickreport = struct {
+        hat = PAD_MASK_NONE,
+        lx = 128,
+        ly = 128,
+        rx = 128,
+        ry = 128,
+    };
     // Treat the directions as digital input
     // shift makes the input register SOCD... ish
+
+    // Check first if shift is pressed and switch on that.
+    // Shift is meant to provide an input similar to a SOCD controller
+    // 
+    // Shift first negates left and right when up or down is pressed
+    // Next, it negates up if left and right were not present
+    // Then it changes Down to UP if present.
+    if buttons.pressed(debounceshift) {
+        if buttons.pressed(debounceup) {
+            if buttons.pressed(debounceleft) {
+                stickreport.hat = PAD_MASK_UP;
+            } else if buttons.pressed(debounceright) {
+                stickreport.hat = PAD_MASK_UP;
+            } else {
+                stickreport.hat = PAD_MASK_NONE;
+            }
+        } else if buttons.pressed(debouncedown) {
+            if buttons.pressed(debounceleft) {
+                stickreport.hat = PAD_MASK_DOWN;
+            } else if buttons.pressed(debounceright) {
+                stickreport.hat = PAD_MASK_DOWN;
+            } else {
+                stickreport.hat = PAD_MASK_UP;
+            }
+        } else {
+            stickreport.hat = PAD_MASK_NONE;
+        }
+    // Without Shift pressed, the directions are normal
+    } else {
+        if buttons.pressed(debounceup) {
+            if buttons.pressed(debounceleft) {
+                stickreport.hat = PAD_MASK_UPLEFT;
+            } else if buttons.pressed(debounceright) {
+                stickreport.hat = PAD_MASK_UPRIGHT;
+            } else {
+                stickreport.hat = PAD_MASK_UP;
+            }
+        } else if buttons.pressed(debouncedown) {
+            if buttons.pressed(debounceleft) {
+                stickreport.hat = PAD_MASK_DOWNLEFT;
+            } else if buttons.pressed debounceright) {
+                stickreport.hat = PAD_MASK_DOWNRIGHT;
+            } else {
+                stickreport.hat = PAD_MASK_DOWN;
+            }
+        } else if buttons.pressed(debounceleft) {
+            stickreport.hat = PAD_MASK_LEFT;
+        } else if buttons.pressed(debounceright) {
+            stickreport.hat = PAD_MASK_RIGHT;
+        } else {
+            stickreport.hat = PAD_MASK_NONE;
+        }
+    }
 }
 
 fn processButtons(& pins: arduino_hal::gpio::Pins) {
@@ -175,9 +296,11 @@ fn main() -> ! {
     let mut mode = Dpad;
 
     loop {
+        // poll the debouncer
+        unsafe {
+            DEBOUNCER.poll()?;
+        }
         // Read what is pressed
-        // we might need to read the debounce objects instead
-        // those should be in an enum.
         let mut buttonstate = buttonRead(debouncebuttons);
         // Update input mode if requested
         let mode = checkModeChange(&buttonstate);
