@@ -1,3 +1,6 @@
+#![no_std]
+#![no_main]
+
 //! HID report for 3-button mouse with a wheel.
 //!
 //! This example only uses one button and no wheel.
@@ -5,6 +8,7 @@
 //! common mice so that one could easily reuse it.
 
 use usbd_hid_device::HidReport;
+use unflappable;
 mod keydata;
 
 /// Hid report for a 3-button mouse with a wheel.

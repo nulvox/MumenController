@@ -2,7 +2,8 @@
 #![no_main]
 
 use unflappable::{debouncer_uninit, Debouncer, default::ActiveLow};
-use panic_halt as _;
+//use panic_halt as _;
+use riscv_atomic_emulation_trap as _;
 mod report;
 mod keydata;
 
