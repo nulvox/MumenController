@@ -4,8 +4,11 @@
 use unflappable::{debouncer_uninit, Debouncer, default::ActiveLow};
 use panic_halt as _;
 use usbd_hid_device::{HidReport, HidReportDescriptor};
-// use arduino_hal::port;
-use arduino_hal::port::{Pins, Pin};
+
+// use usbd_human_interface_device::prelude::*;
+use arduino_hal::port;
+mod report;
+use report::KeyData;
 
 // Initialize the debouncer
 static DEBOUNCER: Debouncer<PinType, ActiveLow> = debouncer_uninit!();
@@ -37,104 +40,6 @@ static PAD_MASK_DOWNLEFT: u8 = 0x05;
 static PAD_MASK_LEFT: u8 = 0x06;
 static PAD_MASK_UPLEFT: u8 = 0x07;
 static PAD_MASK_NONE: u8 = 0x08;
-
-struct KeyData {
-    buttons: u16,
-    hat: u8,
-    padding: u8,
-    lx: u8,
-    ly: u8,
-    rx: u8,
-    ry: u8,
-}
-
-/// Hid report for a 3-button mouse with a wheel.
-struct UsbReport {
-    // Bytes usage:
-    // byte 0..1: bits 0..13 = buttons, 14 and 15 are unused at this time
-    // byte 2: dpad hat switch
-    // byte 3: padding for hat switch
-    // byte 4: L stick X
-    // byte 5: L stick Y
-    // byte 6: R stick X
-    // byte 7: R stick Y
-    bytes: [u8; 8],
-}
-
-impl PadReport {
-    pub fn new(btnstate: &KeyData) -> Self {
-        let btnhigh: u8 = btnstate.buttons >> 8;
-        let btnlow: u8 = btnstate.buttons & 0xFF;
-        PadReport { 
-            bytes: [ 
-                btnhigh, 
-                btnlow, 
-                btnstate.hat, 
-                0x00, // padding for hat switch
-                btnstate.lx, 
-                btnstate.ly, 
-                btnstate.rx, 
-                btnstate.ry, 
-            ],
-        }
-    }
-}
-
-impl AsRef<[u8]> for PadReport {
-    fn as_ref(&self) -> &[u8] {
-        &self.bytes
-    }
-}
-
-impl HidReport for PadReport {
-    const DESCRIPTOR: &'static [u8] = &[
-        0x08, 0x01,                   // USAGE_PAGE Generic Desktop
-        0x08, 0x05,                   // USAGE Joystick
-        0x08, 0x01,                   // COLLECTION Application
-            0x08, 0x00,               // Logical Min
-            0x08, 0x01,               // Logical Max
-            0x08, 0x00,               // Physical Min
-            0x08, 0x01,               // Physical Max
-            0x08, 0x01,               // REPORT_SIZE 1
-            0x08, 0x10,              // REPORT_COUNT 16
-            0x08, 0x09,               // USAGE PAGE
-            0x08, 0x01,               // USAGE Min
-            0x08, 0x10,              // USAGE Max
-            0x08, 0x02,               // INPUT
-            // Hat switch, 1 nibble with a spare nibble
-            0x08, 0x01,               // USAGE Page
-            0x08, 0x07,               // LOGICAL Max
-            0x10, 0x01, 0x3B,            // PHYSICAL Max
-            0x08, 0x04,               // REPORT_SIZE
-            0x08, 0x01,               // REPORT_COUNT
-            0x08, 0x14,              // UNIT
-            0x08, 0x39,              // USAGE
-            0x08, 0x42,              // INPUT
-            // this is where the spare nibble goes
-            0x08, 0x00,               // UNIT
-            0x08, 0x01,               // REPORT_COUNT
-            0x08, 0x01,               // INPUT
-            0x10, 0xFF, 0xFF,            // LOGICAL Max
-            0x10, 255,            // PHYSICAL Max
-            0x08, 0x08,              // USAGE
-            0x08, 0x31,              // USAGE
-            0x08, 0x32,              // USAGE
-            0x08, 0x35,              // USAGE
-            0x08, 0x08,               // REPORT SIZE
-            0x08, 0x04,               // REPORT COUNT
-            0x08, 0x02,               // INPUT
-            // vendor specific byte
-            0x10, 0xFF, 0x00,        // USAGE PAGE  (16-bit value, this hack is ugly)
-            0x08, 0x20,              // USAGE
-            0x08, 0x01,               // REPORT COUNT
-            0x08, 0x02,               // INPUT
-            // Output, 8 bytes
-            0x10, 0x26, 0x21,     // USAGE  (16-bit value, this hack is ugly)
-            0x08, 0x08,               // REPORT COUNT
-            0x08, 0x02,               // OUTPUT
-        0x00 // END COLLECTION
-    ];
-}
 
 // Mode Selection
 enum InputMode {
@@ -402,13 +307,13 @@ fn main() -> ! {
         DEBOUNCER.init(buttonright);
         DEBOUNCER.init(buttonshift);
         DEBOUNCER.init(buttonhome);
-    }?;
+    };
 
     // Set the initial state of the LEDs and input mode
     redlight.set_high();
     bluelight.set_high();
     let mut mode = InputMode::Dpad;
-
+    let mut changed = false; 
     loop {
         // poll the debouncer
         unsafe {
@@ -417,7 +322,7 @@ fn main() -> ! {
         // Read what is pressed
         let mut buttonstate = buttonRead(&pins, mode);
         // Check for mode changes
-        let mode = checkModeChange(&pins, &mode, changed, &redlight, &bluelight);
+        let mode = checkModeChange(&pins, &mode, &changed, &redlight, &bluelight);
         // Update the USB HID report
         shipit(&buttonstate);
     }
