@@ -26,6 +26,7 @@ pub struct Switch<T> {
     double_press: bool,
 }
 
+// @TODO change the InputPin type to one that matches avr_hal
 impl<T> Switch<T>
 where
     T: InputPin,
@@ -176,6 +177,7 @@ pub struct GamePad {
     SwitchRight: SwitchType,
 }
 
+// @TODO the remaining functions in this file should be a trait implemented for GamePad
 // Write the constructor for the gamepad's switches
 pub fn build_gamepad(pins: &[arduino_hal::port::Pin; 16]) -> GamePad {
     let mut switches = GamePad {
