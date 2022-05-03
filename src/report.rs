@@ -25,12 +25,11 @@ pub struct PadReport {
 
 impl PadReport {
     pub fn new(btnstate: &KeyData) -> Self {
-        let btnhigh: u8 = btnstate.buttons >> 8;
-        let btnlow: u8 = btnstate.buttons & 0xFF;
+        let btnarray = btnstate.buttons.to_be_bytes();
         HidReport { 
             bytes: [ 
-                btnhigh, 
-                btnlow, 
+                btnarray[0], 
+                btnarray[1], 
                 btnstate.hat, 
                 0x00, // padding for hat switch
                 btnstate.lx, 
