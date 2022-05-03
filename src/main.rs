@@ -1,17 +1,14 @@
 #![no_std]
 #![no_main]
 
-use unflappable::{debouncer_uninit, Debouncer, default::ActiveLow};
 use panic_halt as _;
 use usbd_hid_device::{HidReport, HidReportDescriptor};
-
-// use usbd_human_interface_device::prelude::*;
 use arduino_hal::port;
+use debouncr::{debounce_8, Debouncer, Edge, Repeat4};
 mod report;
 use report::KeyData;
-
-// Initialize the debouncer
-static DEBOUNCER: Debouncer<PinType, ActiveLow> = debouncer_uninit!();
+mod switches;
+use switches::GamePad;
 
 // Set bounce time in ms
 static BOUNCE_TIME: u16 = 1;
@@ -48,8 +45,12 @@ enum InputMode {
     Smash,
 }
 
+// struct DebouncedInput {
+//     a: 
+// }
+
 // Swap Input mode by pressing HOME and SHIFT
-fn checkModeChange (buttons: &arduino_hal::port::Pins, mode: &InputMode, changed: &bool, redlight: &arduino_hal::port::Pin<mode::Output>, bluelight: &arduino_hal::port::Pin<mode::Output>) -> InputMode {
+fn checkModeChange (buttons: &GamePad, mode: &InputMode, changed: &bool, redlight: &arduino_hal::port::Pin<mode::Output>, bluelight: &arduino_hal::port::Pin<mode::Output>) -> InputMode {
     if !changed && &buttons.ButtonSHIFT.pressed() && &buttons.ButtonHOME.pressed() {
         match mode {
             Dpad => {
@@ -76,67 +77,67 @@ fn checkModeChange (buttons: &arduino_hal::port::Pins, mode: &InputMode, changed
     }
 }
 
-fn processSmash(buttons: &arduino_hal::port::Pins, stickreport: &KeyData) -> &KeyData {
+fn processSmash(buttons: &GamePad, stickreport: &report::KeyData) -> &report::KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes half values
-    if buttons.pressed(buttons.debounceshift) {
-        if buttons.pressed(buttons.debounceup) {
+    if buttons.pressed(buttons.SwitchShift) {
+        if buttons.pressed(buttons.SwitchUp) {
             stickreport.ly = 192;
-        } else if buttons.pressed(buttons.debouncedown) {
+        } else if buttons.pressed(buttons.SwitchDown) {
             stickreport.ly = 64;
         }
-        if buttons.pressed(buttons.debounceleft) {
+        if buttons.pressed(buttons.SwitchLeft) {
             stickreport.lx = 64;
-        } else if buttons.pressed(buttons.debounceright) {
+        } else if buttons.pressed(buttons.SwitchRight) {
             stickreport.lx = 192;
         }
     } else { // report max values for axies
-        if buttons.pressed(buttons.debounceup) {
+        if buttons.pressed(buttons.SwitchUp) {
             stickreport.ly = 255;
-        } else if buttons.pressed(buttons.debouncedown) {
+        } else if buttons.pressed(buttons.SwitchDown) {
             stickreport.ly = 0;
         }
-        if buttons.pressed(buttons.debounceleft) {
+        if buttons.pressed(buttons.SwitchLeft) {
             stickreport.lx = 0;
-        } else if buttons.pressed(buttons.debounceright) {
+        } else if buttons.pressed(buttons.SwitchRight) {
             stickreport.lx = 255;
         }
     }
     return stickreport;
 }
 
-fn processAnalog(buttons: &arduino_hal::port::Pins, stickreport: &KeyData) -> &KeyData {
+fn processAnalog(buttons: &GamePad, stickreport: &report::KeyData) -> &report::KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes the input register right stick
-    if buttons.pressed(buttons.debounceshift) {
-        if buttons.pressed(buttons.debounceup) {
+    if buttons.pressed(buttons.SwitchShift) {
+        if buttons.pressed(buttons.SwitchUp) {
             stickreport.ry = 255;
-        } else if buttons.pressed(buttons.debouncedown) {
+        } else if buttons.pressed(buttons.SwitchDown) {
             stickreport.ry = 0;
         }
-        if buttons.pressed(buttons.debounceleft) {
+        if buttons.pressed(buttons.SwitchLeft) {
             stickreport.rx = 0;
-        } else if buttons.pressed(buttons.debounceright) {
+        } else if buttons.pressed(buttons.SwitchRight) {
             stickreport.rx = 255;
         }
     } else {
-        if buttons.pressed(buttons.debounceup) {
+        if buttons.pressed(buttons.SwitchUp) {
             stickreport.ly = 255;
-        } else if buttons.pressed(buttons.debouncedown) {
+        } else if buttons.pressed(buttons.SwitchDown) {
             stickreport.ly = 0;
         }
-        if buttons.pressed(buttons.debounceleft) {
+        if buttons.pressed(buttons.SwitchLeft) {
             stickreport.lx = 0;
-        } else if buttons.pressed(buttons.debounceright) {
+        } else if buttons.pressed(buttons.SwitchRight) {
             stickreport.lx = 255;
         }
     }
     return stickreport;
 }
 
-fn processDpad(buttons: &arduino_hal::port::Pins, stickreport: &KeyData) -> &KeyData {
+fn processDpad(buttons: &GamePad, stickreport: &report::KeyData) -> &report::KeyData {
     // Dpad modes don't change the analog state
     // Treat the directions as digital input
     // shift makes the input register SOCD... ish
@@ -147,19 +148,19 @@ fn processDpad(buttons: &arduino_hal::port::Pins, stickreport: &KeyData) -> &Key
     // Shift first negates left and right when up or down is pressed
     // Next, it negates up if left and right were not present
     // Then it changes Down to UP if present.
-    if buttons.pressed(buttons.debounceshift) {
-        if buttons.pressed(buttons.debounceup) {
-            if buttons.pressed(buttons.debounceleft) {
+    if buttons.pressed(buttons.SwitchShift) {
+        if buttons.pressed(buttons.SwitchUp) {
+            if buttons.pressed(buttons.SwitchLeft) {
                 stickreport.hat = PAD_MASK_UP;
-            } else if buttons.pressed(buttons.debounceright) {
+            } else if buttons.pressed(buttons.SwitchRight) {
                 stickreport.hat = PAD_MASK_UP;
             } else {
                 stickreport.hat = PAD_MASK_NONE;
             }
-        } else if buttons.pressed(buttons.debouncedown) {
-            if buttons.pressed(buttons.debounceleft) {
+        } else if buttons.pressed(buttons.SwitchDown) {
+            if buttons.pressed(buttons.SwitchLeft) {
                 stickreport.hat = PAD_MASK_DOWN;
-            } else if buttons.pressed(buttons.debounceright) {
+            } else if buttons.pressed(buttons.SwitchRight) {
                 stickreport.hat = PAD_MASK_DOWN;
             } else {
                 stickreport.hat = PAD_MASK_UP;
@@ -169,25 +170,25 @@ fn processDpad(buttons: &arduino_hal::port::Pins, stickreport: &KeyData) -> &Key
         }
     // Without Shift pressed, the directions are normal
     } else {
-        if buttons.pressed(buttons.debounceup) {
-            if buttons.pressed(buttons.debounceleft) {
+        if buttons.pressed(buttons.SwitchUp) {
+            if buttons.pressed(buttons.SwitchLeft) {
                 stickreport.hat = PAD_MASK_UPLEFT;
-            } else if buttons.pressed(buttons.debounceright) {
+            } else if buttons.pressed(buttons.SwitchRight) {
                 stickreport.hat = PAD_MASK_UPRIGHT;
             } else {
                 stickreport.hat = PAD_MASK_UP;
             }
-        } else if buttons.pressed(buttons.debouncedown) {
-            if buttons.pressed(buttons.debounceleft) {
+        } else if buttons.pressed(buttons.SwitchDown) {
+            if buttons.pressed(buttons.SwitchLeft) {
                 stickreport.hat = PAD_MASK_DOWNLEFT;
-            } else if buttons.pressed(buttons.debounceright) {
+            } else if buttons.pressed(buttons.SwitchRight) {
                 stickreport.hat = PAD_MASK_DOWNRIGHT;
             } else {
                 stickreport.hat = PAD_MASK_DOWN;
             }
-        } else if buttons.pressed(buttons.debounceleft) {
+        } else if buttons.pressed(buttons.SwitchLeft) {
             stickreport.hat = PAD_MASK_LEFT;
-        } else if buttons.pressed(buttons.debounceright) {
+        } else if buttons.pressed(buttons.SwitchRight) {
             stickreport.hat = PAD_MASK_RIGHT;
         } else {
             stickreport.hat = PAD_MASK_NONE;
@@ -196,7 +197,7 @@ fn processDpad(buttons: &arduino_hal::port::Pins, stickreport: &KeyData) -> &Key
     return stickreport;
 }
 
-fn buttonRead(pins: &arduino_hal::port::Pins, mode: InputMode) -> KeyData {
+fn buttonRead(signals: &GamePad, mode: InputMode) -> KeyData {
     // Set the report content
     let mut stickreport = KeyData {
         buttons: MASK_NONE,
@@ -209,51 +210,51 @@ fn buttonRead(pins: &arduino_hal::port::Pins, mode: InputMode) -> KeyData {
     };
 
     match mode {
-        InputMode::Smash => processSmash(pins, &stickreport),
-        InputMode::Analog => processAnalog(pins, &stickreport),
-        InputMode::Dpad => processDpad(pins, &stickreport),
+        InputMode::Smash => processSmash(signals, &stickreport),
+        InputMode::Analog => processAnalog(signals, &stickreport),
+        InputMode::Dpad => processDpad(signals, &stickreport),
     };
 
     // read buttons
     // if button is pressed, set the bit
-    if pins.a3.is_high() {
+    if signals.SwitchA.is_high() {
         stickreport.buttons |= MASK_A;
     }
-    if pins.a1.is_high() {
+    if signals.SwitchB.is_high() {
         stickreport.buttons |= MASK_B;
     }
-    if pins.a0.is_high() {
+    if signals.SwitchX.is_high() {
         stickreport.buttons |= MASK_X;
     }
-    if pins.sck.is_high() {
+    if signals.SwitchY.is_high() {
         stickreport.buttons |= MASK_Y;
     }
-    if pins.d5.is_high() {
+    if signals.SwitchL1.is_high() {
         stickreport.buttons |= MASK_R1;
     }
-    if pins.d0.is_high() {
+    if signals.SwitchR1.is_high() {
         stickreport.buttons |= MASK_R2;
     }
-    if pins.a1.is_high() {
+    if signals.SwitchL2.is_high() {
         stickreport.buttons |= MASK_L1;
     }
-    if pins.a2.is_high() {
+    if signals.SwitchR2.is_high() {
         stickreport.buttons |= MASK_L2;
     }
-    if pins.mosi.is_high() {
+    if signals.SwitchSelect.is_high() {
         stickreport.buttons |= MASK_HOME;
     }
-    if pins.miso.is_high() {
+    if signals.SwitchStart.is_high() {
         stickreport.buttons |= MASK_SELECT;
     }
-    if pins.d10.is_high() {
+    if signals.SwitchHome.is_high() {
         stickreport.buttons |= MASK_START;
     }
     return stickreport;
 }
 
 // Build the actual HID Report and send it over the wire
-fn shipit(stickreport: &KeyData) {
+fn shipit(stickreport: &report::KeyData) {
     // Send the report
     // let usb_alloc = UsbBus::new(usb);
     // let mut hid = Hid::<PadReport, _>::new(&stickreport);
@@ -265,49 +266,50 @@ fn shipit(stickreport: &KeyData) {
 fn main() -> ! {
     let dp = arduino_hal::Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(dp);
-    
-    // let pinnames = definePins(&pins);
 
     // Setup pin modes
-    let mut redlight = pins.a3.into_output().downgrade();
-    let mut bluelight = pins.d4.into_output().downgrade();
-    let mut buttona = pins.d3.downgrade();
-    let mut buttonb = pins.a1.downgrade();
-    let mut buttonx = pins.a0.downgrade();
-    let mut buttony = pins.sck.downgrade();
-    let mut buttonl1 = pins.a1.downgrade();
-    let mut buttonr1 = pins.d5.downgrade();
-    let mut buttonl2 = pins.a2.downgrade();
-    let mut buttonr2 = pins.d0.downgrade();
-    let mut buttonselect = pins.miso.downgrade();
-    let mut buttonstart = pins.d10.downgrade();
-    let mut buttonup = pins.d7.downgrade();
-    let mut buttondown = pins.d8.downgrade();
-    let mut buttonleft = pins.d6.downgrade();
-    let mut buttonright = pins.d9.downgrade();
-    let mut buttonshift = pins.d2.downgrade();
-    let mut buttonhome = pins.mosi.downgrade();
+    let mut redlight = pins.a3.into_output().downgrade();    // Red LED
+    let mut bluelight = pins.d4.into_output().downgrade();   // Blue LED
+    let mut buttona = pins.d3.downgrade();                   // Button A
+    let mut buttonb = pins.a1.downgrade();                   // Button B
+    let mut buttonx = pins.a0.downgrade();                   // Button X
+    let mut buttony = pins.sck.downgrade();                  // Button Y
+    let mut buttonl1 = pins.a1.downgrade();                  // Button L1
+    let mut buttonr1 = pins.d5.downgrade();                  // Button R1
+    let mut buttonl2 = pins.a2.downgrade();                  // Button L2
+    let mut buttonr2 = pins.d0.downgrade();                  // Button R2
+    let mut buttonselect = pins.miso.downgrade();            // Button Select
+    let mut buttonstart = pins.d10.downgrade();              // Button Start
+    let mut buttonhome = pins.mosi.downgrade();              // Button Home
+    let mut buttonshift = pins.d2.downgrade();               // Button Shift
+    let mut buttonup = pins.d7.downgrade();                  // Button Up
+    let mut buttondown = pins.d8.downgrade();                // Button Down
+    let mut buttonleft = pins.d6.downgrade();                // Button Left
+    let mut buttonright = pins.d9.downgrade();               // Button Right
 
-    // Setup debounce enum
-    // Handle these errors now...
-    unsafe {
-        DEBOUNCER.init(buttona);
-        DEBOUNCER.init(buttonb);
-        DEBOUNCER.init(buttonx);
-        DEBOUNCER.init(buttony);
-        DEBOUNCER.init(buttonl1);
-        DEBOUNCER.init(buttonr1);
-        DEBOUNCER.init(buttonl2);
-        DEBOUNCER.init(buttonr2);
-        DEBOUNCER.init(buttonselect);
-        DEBOUNCER.init(buttonstart);
-        DEBOUNCER.init(buttonup);
-        DEBOUNCER.init(buttondown);
-        DEBOUNCER.init(buttonleft);
-        DEBOUNCER.init(buttonright);
-        DEBOUNCER.init(buttonshift);
-        DEBOUNCER.init(buttonhome);
-    };
+    let pin_array = [
+        buttona,
+        buttonb,
+        buttonx,
+        buttony,
+        buttonl1,
+        buttonr1,
+        buttonl2,
+        buttonr2,
+        buttonselect,
+        buttonstart,
+        buttonhome,
+        buttonshift,
+        buttonup,
+        buttondown,
+        buttonleft,
+        buttonright,
+    ];
+
+    // Initialize the debouncer
+    let mut debouncer = debounce_8(true);
+    // Package the keys into a struct
+    let mut gamepad_signals = switches::build_gamepad(&pin_array);
 
     // Set the initial state of the LEDs and input mode
     redlight.set_high();
@@ -316,13 +318,11 @@ fn main() -> ! {
     let mut changed = false; 
     loop {
         // poll the debouncer
-        unsafe {
-            DEBOUNCER.poll()?;
-        }
-        // Read what is pressed
-        let mut buttonstate = buttonRead(&pins, mode);
+        let gamepad_signals = switches::poll_debouncers(&mut debouncer, &mut gamepad_signals);
         // Check for mode changes
-        let mode = checkModeChange(&pins, &mode, &changed, &redlight, &bluelight);
+        let mode = checkModeChange(&gamepad_signals, &mode, &changed, &redlight, &bluelight);
+        // Read what is pressed
+        let mut buttonstate = buttonRead(&gamepad_signals, mode);
         // Update the USB HID report
         shipit(&buttonstate);
     }
