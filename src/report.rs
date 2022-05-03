@@ -1,13 +1,13 @@
 use usbd_hid_device::HidReport;
 
 pub struct KeyData {
-    buttons: u16,
-    hat: u8,
-    padding: u8,
-    lx: u8,
-    ly: u8,
-    rx: u8,
-    ry: u8,
+    pub buttons: u16,
+    pub hat: u8,
+    pub padding: u8,
+    pub lx: u8,
+    pub ly: u8,
+    pub rx: u8,
+    pub ry: u8,
 }
 
 /// Hid report for a 3-button mouse with a wheel.
