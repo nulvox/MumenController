@@ -3,8 +3,10 @@
 
 use panic_halt as _;
 use usbd_hid_device::{HidReport, HidReportDescriptor};
-use arduino_hal::port;
-use debouncr::{debounce_8, Debouncer, Edge, Repeat4};
+// use arduino_hal::port;
+use arduino_hal;
+// use debouncr::{debounce_8, Debouncer, Edge, Repeat4};
+use debouncr::debounce_8;
 mod report;
 use report::KeyData;
 mod switches;
@@ -45,12 +47,14 @@ enum InputMode {
     Smash,
 }
 
-// struct DebouncedInput {
-//     a: 
-// }
-
 // Swap Input mode by pressing HOME and SHIFT
-fn checkModeChange (buttons: &GamePad, mode: &InputMode, changed: &bool, redlight: &arduino_hal::port::Pin<mode::Output>, bluelight: &arduino_hal::port::Pin<mode::Output>) -> InputMode {
+fn checkModeChange (
+    buttons: &GamePad, 
+    mode: &InputMode, 
+    changed: &bool, 
+    redlight: &arduino_hal::port::Pin<mode::Output>, 
+    bluelight: &arduino_hal::port::Pin<mode::Output>
+) -> InputMode {
     if !changed && &buttons.ButtonSHIFT.pressed() && &buttons.ButtonHOME.pressed() {
         match mode {
             Dpad => {
@@ -77,7 +81,7 @@ fn checkModeChange (buttons: &GamePad, mode: &InputMode, changed: &bool, redligh
     }
 }
 
-fn processSmash(buttons: &GamePad, stickreport: &report::KeyData) -> &report::KeyData {
+fn processSmash(buttons: &GamePad, stickreport: &report::KeyData) -> report::KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes half values
@@ -104,10 +108,10 @@ fn processSmash(buttons: &GamePad, stickreport: &report::KeyData) -> &report::Ke
             stickreport.lx = 255;
         }
     }
-    return stickreport;
+    return *stickreport;
 }
 
-fn processAnalog(buttons: &GamePad, stickreport: &report::KeyData) -> &report::KeyData {
+fn processAnalog(buttons: &GamePad, stickreport: &KeyData) -> KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes the input register right stick
@@ -134,10 +138,10 @@ fn processAnalog(buttons: &GamePad, stickreport: &report::KeyData) -> &report::K
             stickreport.lx = 255;
         }
     }
-    return stickreport;
+    return *stickreport;
 }
 
-fn processDpad(buttons: &GamePad, stickreport: &report::KeyData) -> &report::KeyData {
+fn processDpad(buttons: &GamePad, stickreport: &KeyData) -> KeyData {
     // Dpad modes don't change the analog state
     // Treat the directions as digital input
     // shift makes the input register SOCD... ish
@@ -194,7 +198,7 @@ fn processDpad(buttons: &GamePad, stickreport: &report::KeyData) -> &report::Key
             stickreport.hat = PAD_MASK_NONE;
         }
     }
-    return stickreport;
+    return *stickreport;
 }
 
 fn buttonRead(signals: &GamePad, mode: InputMode) -> KeyData {
@@ -256,6 +260,8 @@ fn buttonRead(signals: &GamePad, mode: InputMode) -> KeyData {
 // Build the actual HID Report and send it over the wire
 fn shipit(stickreport: &report::KeyData) {
     // Send the report
+
+    // this stuff might be important... check it out
     // let usb_alloc = UsbBus::new(usb);
     // let mut hid = Hid::<PadReport, _>::new(&stickreport);
     let mut hid = usbd_hid_device::Hid::<HidReport, _>::new(&stickreport);

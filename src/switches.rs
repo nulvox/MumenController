@@ -1,5 +1,7 @@
 use debouncr::{debounce_8, Debouncer, Edge, Repeat4};
-use arduino_hal::port;
+// use debouncer::debounce_8;
+// use arduino_hal::port;
+use arduino_hal;
 use crate::report;
 // use report::KeyData;
 
@@ -158,45 +160,46 @@ where
     }
 }
 
+// no nested structs, they say I'm a bad developer
 pub struct GamePad {
-    SwitchA: SwitchType, 
-    SwitchB: SwitchType,
-    SwitchX: SwitchType,
-    SwitchY: SwitchType,
-    SwitchL1: SwitchType,
-    SwitchR1: SwitchType,
-    SwitchL2: SwitchType,
-    SwitchR2: SwitchType,
-    SwitchSelect: SwitchType,
-    SwitchStart: SwitchType,
-    SwitchHome: SwitchType,
-    SwitchShift: SwitchType,
-    SwitchUp: SwitchType,
-    SwitchDown: SwitchType,
-    SwitchLeft: SwitchType,
-    SwitchRight: SwitchType,
+    SwitchA: struct Switch,
+    SwitchB: struct Switch,
+    SwitchX: struct Switch,
+    SwitchY: struct Switch,
+    SwitchL1: struct Switch,
+    SwitchR1: struct Switch,
+    SwitchL2: struct Switch,
+    SwitchR2: struct Switch,
+    SwitchSelect: struct Switch,
+    SwitchStart: struct Switch,
+    SwitchHome: struct Switch,
+    SwitchShift: struct Switch,
+    SwitchUp: struct Switch,
+    SwitchDown: struct Switch,
+    SwitchLeft: struct Switch,
+    SwitchRight: struct Switch,
 }
 
 // @TODO the remaining functions in this file should be a trait implemented for GamePad
 // Write the constructor for the gamepad's switches
 pub fn build_gamepad(pins: &[arduino_hal::port::Pin; 16]) -> GamePad {
     let mut switches = GamePad {
-        SwitchA: Switch::new(pins[0].into_input_pin(), SwitchType::PullUp),
-        SwitchB: Switch::new(pins[1].into_input_pin(), SwitchType::PullUp),
-        SwitchX: Switch::new(pins[2].into_input_pin(), SwitchType::PullUp),
-        SwitchY: Switch::new(pins[3].into_input_pin(), SwitchType::PullUp),
-        SwitchL1: Switch::new(pins[4].into_input_pin(), SwitchType::PullUp),
-        SwitchR1: Switch::new(pins[5].into_input_pin(), SwitchType::PullUp),
-        SwitchL2: Switch::new(pins[6].into_input_pin(), SwitchType::PullUp),
-        SwitchR2: Switch::new(pins[7].into_input_pin(), SwitchType::PullUp),
-        SwitchSelect: Switch::new(pins[8].into_input_pin(), SwitchType::PullUp),
-        SwitchStart: Switch::new(pins[9].into_input_pin(), SwitchType::PullUp),
-        SwitchHome: Switch::new(pins[10].into_input_pin(), SwitchType::PullUp),
-        SwitchShift: Switch::new(pins[11].into_input_pin(), SwitchType::PullUp),
-        SwitchUp: Switch::new(pins[12].into_input_pin(), SwitchType::PullUp),
-        SwitchDown: Switch::new(pins[13].into_input_pin(), SwitchType::PullUp),
-        SwitchLeft: Switch::new(pins[14].into_input_pin(), SwitchType::PullUp),
-        SwitchRight: Switch::new(pins[15].into_input_pin(), SwitchType::PullUp),
+        SwitchA: Switch::new(pins[0].into_float(), SwitchType::PullUp),
+        SwitchB: Switch::new(pins[1].into_float(), SwitchType::PullUp),
+        SwitchX: Switch::new(pins[2].into_float(), SwitchType::PullUp),
+        SwitchY: Switch::new(pins[3].into_float(), SwitchType::PullUp),
+        SwitchL1: Switch::new(pins[4].into_float(), SwitchType::PullUp),
+        SwitchR1: Switch::new(pins[5].into_float(), SwitchType::PullUp),
+        SwitchL2: Switch::new(pins[6].into_float(), SwitchType::PullUp),
+        SwitchR2: Switch::new(pins[7].into_float(), SwitchType::PullUp),
+        SwitchSelect: Switch::new(pins[8].into_float(), SwitchType::PullUp),
+        SwitchStart: Switch::new(pins[9].into_float(), SwitchType::PullUp),
+        SwitchHome: Switch::new(pins[10].into_float(), SwitchType::PullUp),
+        SwitchShift: Switch::new(pins[11].into_float(), SwitchType::PullUp),
+        SwitchUp: Switch::new(pins[12].into_float(), SwitchType::PullUp),
+        SwitchDown: Switch::new(pins[13].into_float(), SwitchType::PullUp),
+        SwitchLeft: Switch::new(pins[14].into_float(), SwitchType::PullUp),
+        SwitchRight: Switch::new(pins[15].into_float(), SwitchType::PullUp),
     };
     return switches;
 }
