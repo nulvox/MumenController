@@ -4,6 +4,8 @@
 use unflappable::{debouncer_uninit, Debouncer, default::ActiveLow};
 use panic_halt as _;
 use usbd_hid_device::{HidReport, HidReportDescriptor};
+// use arduino_hal::port;
+use arduino_hal::port::{Pins, Pin};
 
 // Initialize the debouncer
 static DEBOUNCER: Debouncer<PinType, ActiveLow> = debouncer_uninit!();
@@ -60,7 +62,7 @@ struct UsbReport {
 }
 
 impl PadReport {
-    pub fn new(btnstate: &enum) -> Self {
+    pub fn new(btnstate: &KeyData) -> Self {
         let btnhigh: u8 = btnstate.buttons >> 8;
         let btnlow: u8 = btnstate.buttons & 0xFF;
         PadReport { 
@@ -142,59 +144,34 @@ enum InputMode {
 }
 
 // Swap Input mode by pressing HOME and SHIFT
-fn checkModeChange (buttons, mode: &InputMode, changed: &bool, indicators: &enum) -> &InputMode {
-    if !changed && buttons.ButtonSHIFT.pressed() && buttons.ButtonHOME.pressed() {
+fn checkModeChange (buttons: &arduino_hal::port::Pins, mode: &InputMode, changed: &bool, redlight: &arduino_hal::port::Pin<mode::Output>, bluelight: &arduino_hal::port::Pin<mode::Output>) -> InputMode {
+    if !changed && &buttons.ButtonSHIFT.pressed() && &buttons.ButtonHOME.pressed() {
         match mode {
             Dpad => {
                 mode = &InputMode::Analog;
-                indicators.redlight.set_high();
-                indicators.bluelight.set_high();
+                *redlight.set_high();
+                *bluelight.set_high();
             },
             Analog => {
                 mode = &InputMode::Smash;
-                indicators.redlight.set_high();
-                indicators.bluelight.set_low();
+                *redlight.set_high();
+                *bluelight.set_low();
             },
             Smash => {
                 mode = &InputMode::Dpad;
-                indicators.redlight.set_low();
-                indicators.bluelight.set_high();
+                *redlight.set_low();
+                *bluelight.set_high();
             },
         }
         let changed = true;
-        return mode;
+        return *mode;
     } else {
         let changed = false;
-        return mode;
+        return *mode;
     }
 }
 
-// Define your pinout here
-fn definePins(&mut pins: arduino_hal::gpio::Pins) {
-    // Return a struct with named objects
-    enum {
-        RedLight: pins.a3,
-        BlueLight: pins.d4,
-        ButtonA: pins.d3,
-        ButtonB: pins.a1,
-        ButtonX: pins.a0,
-        ButtonY: pins.d15,
-        ButtonL1: pins.d19,
-        ButtonR1: pins.d5,
-        ButtonL2: pins.a2,
-        ButtonR2: pins.d0,
-        ButtonSELECT: pins.d14,
-        ButtonSTART: pins.d10,
-        ButtonUP: pins.d7,
-        ButtonDOWN: pins.d8,
-        ButtonLEFT: pins.d6,
-        ButtonRIGHT: pins.d9,
-        ButtonSHIFT: pins.d2,
-        ButtonHOME: pins.d16,
-    }
-}
-
-fn processSmash(& buttons: arduino_hal::gpio::Pins, stickreport: &KeyData) -> &KeyData {
+fn processSmash(buttons: &arduino_hal::port::Pins, stickreport: &KeyData) -> &KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes half values
@@ -224,7 +201,7 @@ fn processSmash(& buttons: arduino_hal::gpio::Pins, stickreport: &KeyData) -> &K
     return stickreport;
 }
 
-fn processAnalog(& buttons: arduino_hal::gpio::Pins, stickreport: &KeyData) -> &KeyData {
+fn processAnalog(buttons: &arduino_hal::port::Pins, stickreport: &KeyData) -> &KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes the input register right stick
@@ -254,7 +231,7 @@ fn processAnalog(& buttons: arduino_hal::gpio::Pins, stickreport: &KeyData) -> &
     return stickreport;
 }
 
-fn processDpad(& buttons: arduino_hal::gpio::Pins, stickreport: &KeyData) -> &KeyData {
+fn processDpad(buttons: &arduino_hal::port::Pins, stickreport: &KeyData) -> &KeyData {
     // Dpad modes don't change the analog state
     // Treat the directions as digital input
     // shift makes the input register SOCD... ish
@@ -314,7 +291,7 @@ fn processDpad(& buttons: arduino_hal::gpio::Pins, stickreport: &KeyData) -> &Ke
     return stickreport;
 }
 
-fn buttonRead(& pins: arduino_hal::gpio::Pins, mode: InputMode) -> KeyData {
+fn buttonRead(pins: &arduino_hal::port::Pins, mode: InputMode) -> KeyData {
     // Set the report content
     let mut stickreport = KeyData {
         buttons: MASK_NONE,
@@ -334,37 +311,37 @@ fn buttonRead(& pins: arduino_hal::gpio::Pins, mode: InputMode) -> KeyData {
 
     // read buttons
     // if button is pressed, set the bit
-    if pins.debouncea.is_high() {
+    if pins.a3.is_high() {
         stickreport.buttons |= MASK_A;
     }
-    if pins.debounceb.is_high() {
+    if pins.a1.is_high() {
         stickreport.buttons |= MASK_B;
     }
-    if pins.debouncex.is_high() {
+    if pins.a0.is_high() {
         stickreport.buttons |= MASK_X;
     }
-    if pins.debouncey.is_high() {
+    if pins.sck.is_high() {
         stickreport.buttons |= MASK_Y;
     }
-    if pins.deboucer1.is_high() {
+    if pins.d5.is_high() {
         stickreport.buttons |= MASK_R1;
     }
-    if pins.debouncer2.is_high() {
+    if pins.d0.is_high() {
         stickreport.buttons |= MASK_R2;
     }
-    if pins.deboucel1.is_high() {
+    if pins.a1.is_high() {
         stickreport.buttons |= MASK_L1;
     }
-    if pins.deboucel2.is_high() {
+    if pins.a2.is_high() {
         stickreport.buttons |= MASK_L2;
     }
-    if pins.debouncehome.is_high() {
+    if pins.mosi.is_high() {
         stickreport.buttons |= MASK_HOME;
     }
-    if pins.debounceselect.is_high() {
+    if pins.miso.is_high() {
         stickreport.buttons |= MASK_SELECT;
     }
-    if pins.debouncestart.is_high() {
+    if pins.d10.is_high() {
         stickreport.buttons |= MASK_START;
     }
     return stickreport;
@@ -384,53 +361,53 @@ fn main() -> ! {
     let dp = arduino_hal::Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(dp);
     
-    let enum pinnames = definePins(mut &pins);
+    // let pinnames = definePins(&pins);
 
     // Setup pin modes
-    let mut redlight = pinnames.RedLight.into_output();
-    let mut bluelight = pinnames.BlueLight.into_output();
-    let mut buttona = pinnames.ButtonA.into_float();
-    let mut buttonb = pinnames.ButtonB.into_float();
-    let mut buttonx = pinnames.ButtonX.into_float();
-    let mut buttony = pinnames.ButtonY.into_float();
-    let mut buttonl1 = pinnames.ButtonL1.into_float();
-    let mut buttonr1 = pinnames.ButtonR1.into_float();
-    let mut buttonl2 = pinnames.ButtonL2.into_float();
-    let mut buttonr2 = pinnames.ButtonR2.into_float();
-    let mut buttonselect = pinnames.ButtonSELECT.into_float();
-    let mut buttonstart = pinnames.ButtonSTART.into_float();
-    let mut buttonup = pinnames.ButtonUP.into_float();
-    let mut buttondown = pinnames.ButtonDOWN.into_float();
-    let mut buttonleft = pinnames.ButtonLEFT.into_float();
-    let mut buttonright = pinnames.ButtonRIGHT.into_float();
-    let mut buttonshift = pinnames.ButtonSHIFT.into_float();
-    let mut buttonhome = pinnames.ButtonHOME.into_float();
+    let mut redlight = pins.a3.into_output().downgrade();
+    let mut bluelight = pins.d4.into_output().downgrade();
+    let mut buttona = pins.d3.downgrade();
+    let mut buttonb = pins.a1.downgrade();
+    let mut buttonx = pins.a0.downgrade();
+    let mut buttony = pins.sck.downgrade();
+    let mut buttonl1 = pins.a1.downgrade();
+    let mut buttonr1 = pins.d5.downgrade();
+    let mut buttonl2 = pins.a2.downgrade();
+    let mut buttonr2 = pins.d0.downgrade();
+    let mut buttonselect = pins.miso.downgrade();
+    let mut buttonstart = pins.d10.downgrade();
+    let mut buttonup = pins.d7.downgrade();
+    let mut buttondown = pins.d8.downgrade();
+    let mut buttonleft = pins.d6.downgrade();
+    let mut buttonright = pins.d9.downgrade();
+    let mut buttonshift = pins.d2.downgrade();
+    let mut buttonhome = pins.mosi.downgrade();
 
     // Setup debounce enum
-    let mut debouncebuttons = enum {
-        debouncea = unsafe { DEBOUNCER.init(buttona) }?;
-        debounceb = unsafe { DEBOUNCER.init(buttonb) }?;
-        debouncex = unsafe { DEBOUNCER.init(buttonx) }?;
-        debouncey = unsafe { DEBOUNCER.init(buttony) }?;
-        debouncel1 = unsafe { DEBOUNCER.init(buttonl1) }?;
-        debouncer1 = unsafe { DEBOUNCER.init(buttonr1) }?;
-        debouncel2 = unsafe { DEBOUNCER.init(buttonl2) }?;
-        debouncer2 = unsafe { DEBOUNCER.init(buttonr2) }?;
-        debounceselect = unsafe { DEBOUNCER.init(buttonselect) }?;
-        debouncestart = unsafe { DEBOUNCER.init(buttonstart) }?;
-        debounceup = unsafe { DEBOUNCER.init(buttonup) }?;
-        debouncedown = unsafe { DEBOUNCER.init(buttondown) }?;
-        debounceleft = unsafe { DEBOUNCER.init(buttonleft) }?;
-        debounceright = unsafe { DEBOUNCER.init(buttonright) }?;
-        debounceshift = unsafe { DEBOUNCER.init(buttonshift) }?;
-        debouncehome = unsafe { DEBOUNCER.init(buttonhome) }?;
-    }
+    // Handle these errors now...
+    unsafe {
+        DEBOUNCER.init(buttona);
+        DEBOUNCER.init(buttonb);
+        DEBOUNCER.init(buttonx);
+        DEBOUNCER.init(buttony);
+        DEBOUNCER.init(buttonl1);
+        DEBOUNCER.init(buttonr1);
+        DEBOUNCER.init(buttonl2);
+        DEBOUNCER.init(buttonr2);
+        DEBOUNCER.init(buttonselect);
+        DEBOUNCER.init(buttonstart);
+        DEBOUNCER.init(buttonup);
+        DEBOUNCER.init(buttondown);
+        DEBOUNCER.init(buttonleft);
+        DEBOUNCER.init(buttonright);
+        DEBOUNCER.init(buttonshift);
+        DEBOUNCER.init(buttonhome);
+    }?;
 
     // Set the initial state of the LEDs and input mode
     redlight.set_high();
     bluelight.set_high();
-    let mut indicators = {redligh, bluelight};
-    let mut mode = Dpad;
+    let mut mode = InputMode::Dpad;
 
     loop {
         // poll the debouncer
@@ -438,9 +415,9 @@ fn main() -> ! {
             DEBOUNCER.poll()?;
         }
         // Read what is pressed
-        let mut buttonstate = buttonRead(debouncebuttons, mut &mode, &indicators);
+        let mut buttonstate = buttonRead(&pins, mode);
         // Check for mode changes
-        let mode = checkMode(debouncebuttons, mut &mode);
+        let mode = checkModeChange(&pins, &mode, changed, &redlight, &bluelight);
         // Update the USB HID report
         shipit(&buttonstate);
     }
