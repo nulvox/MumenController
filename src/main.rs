@@ -2,7 +2,7 @@
 #![no_main]
 
 use panic_halt as _;
-use usbd_hid_device::{HidReport, HidReportDescriptor};
+// use usbd_hid_device::HidReport;
 // use arduino_hal::port;
 use arduino_hal;
 // use debouncr::{debounce_8, Debouncer, Edge, Repeat4};
@@ -51,37 +51,37 @@ enum InputMode {
 fn checkModeChange (
     buttons: &[Switch], 
     mode: &InputMode, 
-    changed: &bool, 
+    _changed: &mut bool, 
     redlight: &arduino_hal::port::Pin<arduino_hal::port::mode::Output>, 
     bluelight: &arduino_hal::port::Pin<arduino_hal::port::mode::Output>
 ) -> InputMode {
-    if !changed && buttons[switches::SwitchShift].is_pressed() && buttons[switches::SwitchHome].is_pressed() {
+    if !*_changed && buttons[switches::SwitchShift].is_pressed() && buttons[switches::SwitchHome].is_pressed() {
         match mode {
-            Dpad => {
+            InputMode::Dpad => {
                 mode = &InputMode::Analog;
                 redlight.set_high();
                 bluelight.set_high();
             },
-            Analog => {
+            InputMode::Analog => {
                 mode = &InputMode::Smash;
                 redlight.set_high();
                 bluelight.set_low();
             },
-            Smash => {
+            InputMode::Smash => {
                 mode = &InputMode::Dpad;
                 redlight.set_low();
                 bluelight.set_high();
             },
         }
-        let changed = true;
+        let _changed = true;
         return *mode;
     } else {
-        let changed = false;
+        let _changed = false;
         return *mode;
     }
 }
 
-fn processSmash(buttons: &[Switch], stickreport: &report::KeyData) -> report::KeyData {
+fn processSmash(buttons: &[Switch], stickreport: &mut report::KeyData) -> report::KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes half values
@@ -111,7 +111,7 @@ fn processSmash(buttons: &[Switch], stickreport: &report::KeyData) -> report::Ke
     return *stickreport;
 }
 
-fn processAnalog(buttons: &[Switch], stickreport: &KeyData) -> KeyData {
+fn processAnalog(buttons: &[Switch], stickreport: &mut KeyData) -> KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes the input register right stick
@@ -141,7 +141,7 @@ fn processAnalog(buttons: &[Switch], stickreport: &KeyData) -> KeyData {
     return *stickreport;
 }
 
-fn processDpad(buttons: &[Switch], stickreport: &KeyData) -> KeyData {
+fn processDpad(buttons: &[Switch], stickreport: &mut KeyData) -> KeyData {
     // Dpad modes don't change the analog state
     // Treat the directions as digital input
     // shift makes the input register SOCD... ish
@@ -214,9 +214,9 @@ fn buttonRead(signals: &[Switch], mode: InputMode) -> KeyData {
     };
 
     match mode {
-        InputMode::Smash => processSmash(signals, &stickreport),
-        InputMode::Analog => processAnalog(signals, &stickreport),
-        InputMode::Dpad => processDpad(signals, &stickreport),
+        InputMode::Smash => processSmash(signals, &mut stickreport),
+        InputMode::Analog => processAnalog(signals, &mut stickreport),
+        InputMode::Dpad => processDpad(signals, &mut stickreport),
     };
 
     // read buttons
@@ -264,8 +264,8 @@ fn shipit(stickreport: &report::KeyData) {
     // this stuff might be important... check it out
     // let usb_alloc = UsbBus::new(usb);
     // let mut hid = Hid::<PadReport, _>::new(&stickreport);
-    let mut hid = usbd_hid_device::Hid::<HidReport, _>::new(&stickreport);
-    hid.send(&hid).unwrap();
+    let hid = report::PadReport::new(&stickreport);
+    hid.send();
 }
 
 #[arduino_hal::entry]
@@ -276,22 +276,22 @@ fn main() -> ! {
     // Setup pin modes
     let mut redlight = pins.a3.into_output().downgrade();    // Red LED
     let mut bluelight = pins.d4.into_output().downgrade();   // Blue LED
-    let mut buttona = pins.d3.downgrade();                   // Button A
-    let mut buttonb = pins.a1.downgrade();                   // Button B
-    let mut buttonx = pins.a0.downgrade();                   // Button X
-    let mut buttony = pins.sck.downgrade();                  // Button Y
-    let mut buttonl1 = pins.a1.downgrade();                  // Button L1
-    let mut buttonr1 = pins.d5.downgrade();                  // Button R1
-    let mut buttonl2 = pins.a2.downgrade();                  // Button L2
-    let mut buttonr2 = pins.d0.downgrade();                  // Button R2
-    let mut buttonselect = pins.miso.downgrade();            // Button Select
-    let mut buttonstart = pins.d10.downgrade();              // Button Start
-    let mut buttonhome = pins.mosi.downgrade();              // Button Home
-    let mut buttonshift = pins.d2.downgrade();               // Button Shift
-    let mut buttonup = pins.d7.downgrade();                  // Button Up
-    let mut buttondown = pins.d8.downgrade();                // Button Down
-    let mut buttonleft = pins.d6.downgrade();                // Button Left
-    let mut buttonright = pins.d9.downgrade();               // Button Right
+    let buttona = pins.d3.downgrade();                   // Button A
+    let buttonb = pins.a1.downgrade();                   // Button B
+    let buttonx = pins.a0.downgrade();                   // Button X
+    let buttony = pins.sck.downgrade();                  // Button Y
+    let buttonl1 = pins.a1.downgrade();                  // Button L1
+    let buttonr1 = pins.d5.downgrade();                  // Button R1
+    let buttonl2 = pins.a2.downgrade();                  // Button L2
+    let buttonr2 = pins.d0.downgrade();                  // Button R2
+    let buttonselect = pins.miso.downgrade();            // Button Select
+    let buttonstart = pins.d10.downgrade();              // Button Start
+    let buttonhome = pins.mosi.downgrade();              // Button Home
+    let buttonshift = pins.d2.downgrade();               // Button Shift
+    let buttonup = pins.d7.downgrade();                  // Button Up
+    let buttondown = pins.d8.downgrade();                // Button Down
+    let buttonleft = pins.d6.downgrade();                // Button Left
+    let buttonright = pins.d9.downgrade();               // Button Right
 
     let pin_array = [
         buttona,
@@ -313,22 +313,23 @@ fn main() -> ! {
     ];
 
     // Initialize the debouncer
-    let mut debouncer = debounce_8(true);
+    // I should use this somewhere...
+    let _debouncer = debounce_8(true);
     // Package the keys into a struct
     let mut gamepad_signals = switches::build_gamepad(&pin_array);
 
     // Set the initial state of the LEDs and input mode
     redlight.set_high();
     bluelight.set_high();
-    let mut mode = InputMode::Dpad;
-    let mut changed = false; 
+    let mode = InputMode::Dpad;
+    let mut _changed = false; 
     loop {
         // poll the debouncer
         let gamepad_signals = switches::poll_debouncers(&mut gamepad_signals);
         // Check for mode changes
-        let mode = checkModeChange(&gamepad_signals, &mode, &changed, &redlight, &bluelight);
+        let mode = checkModeChange(&gamepad_signals, &mode, &mut _changed, &redlight, &bluelight);
         // Read what is pressed
-        let mut buttonstate = buttonRead(&gamepad_signals, mode);
+        let buttonstate = buttonRead(&gamepad_signals, mode);
         // Update the USB HID report
         shipit(&buttonstate);
     }

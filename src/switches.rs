@@ -48,11 +48,11 @@ pub struct Switch {
 impl Switch {
     /// Create a new Switch.
     pub fn new(
-        pin: arduino_hal::port::Pin<arduino_hal::port::mode::Input<arduino_hal::port::mode::Floating>>, 
+        pin: &arduino_hal::port::Pin<arduino_hal::port::mode::Input<arduino_hal::port::mode::Floating>>, 
         switch_type: SwitchType) 
         -> Self {
         Self {
-            pin,
+            pin: *pin.clone(),
             state: debounce_8(true),
             falling: false,
             rising: false,
@@ -178,23 +178,23 @@ impl Switch {
 // @TODO the remaining functions in this file should be a trait implemented for GamePad
 // Write the constructor for the gamepad's switches
 pub fn build_gamepad(pins: &[arduino_hal::port::Pin<arduino_hal::port::mode::Input<arduino_hal::port::mode::Floating>>; 16]) -> [Switch; 16] {
-    let mut switch_array = [
-        Switch::new(pins[SwitchA], SwitchType::PullUp),
-        Switch::new(pins[SwitchB], SwitchType::PullUp),
-        Switch::new(pins[SwitchX], SwitchType::PullUp),
-        Switch::new(pins[SwitchY], SwitchType::PullUp),
-        Switch::new(pins[SwitchL1], SwitchType::PullUp),
-        Switch::new(pins[SwitchR1], SwitchType::PullUp),
-        Switch::new(pins[SwitchL2], SwitchType::PullUp),
-        Switch::new(pins[SwitchR2], SwitchType::PullUp),
-        Switch::new(pins[SwitchSelect], SwitchType::PullUp),
-        Switch::new(pins[SwitchStart], SwitchType::PullUp),
-        Switch::new(pins[SwitchHome], SwitchType::PullUp),
-        Switch::new(pins[SwitchShift], SwitchType::PullUp),
-        Switch::new(pins[SwitchUp], SwitchType::PullUp),
-        Switch::new(pins[SwitchDown], SwitchType::PullUp),
-        Switch::new(pins[SwitchLeft], SwitchType::PullUp),
-        Switch::new(pins[SwitchRight], SwitchType::PullUp),
+    let switch_array = [
+        Switch::new(&pins[SwitchA], SwitchType::PullUp),
+        Switch::new(&pins[SwitchB], SwitchType::PullUp),
+        Switch::new(&pins[SwitchX], SwitchType::PullUp),
+        Switch::new(&pins[SwitchY], SwitchType::PullUp),
+        Switch::new(&pins[SwitchL1], SwitchType::PullUp),
+        Switch::new(&pins[SwitchR1], SwitchType::PullUp),
+        Switch::new(&pins[SwitchL2], SwitchType::PullUp),
+        Switch::new(&pins[SwitchR2], SwitchType::PullUp),
+        Switch::new(&pins[SwitchSelect], SwitchType::PullUp),
+        Switch::new(&pins[SwitchStart], SwitchType::PullUp),
+        Switch::new(&pins[SwitchHome], SwitchType::PullUp),
+        Switch::new(&pins[SwitchShift], SwitchType::PullUp),
+        Switch::new(&pins[SwitchUp], SwitchType::PullUp),
+        Switch::new(&pins[SwitchDown], SwitchType::PullUp),
+        Switch::new(&pins[SwitchLeft], SwitchType::PullUp),
+        Switch::new(&pins[SwitchRight], SwitchType::PullUp),
     ];
     return switch_array;
 }

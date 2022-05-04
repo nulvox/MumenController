@@ -39,6 +39,11 @@ impl PadReport {
             ],
         }
     }
+
+    pub fn send(&self) {
+        return
+    }
+
 }
 
 impl AsRef<[u8]> for PadReport {
