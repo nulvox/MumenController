@@ -181,7 +181,7 @@ where
 // @TODO the remaining functions in this file should be a trait implemented for GamePad
 // Write the constructor for the gamepad's switches
 pub fn build_gamepad(pins: &[arduino_hal::port::Pin; 16]) -> [Switch] {
-    let mut switches = [Switch<T>] {
+    let mut switches = [
         Switch::new(pins[SwitchA].into_float(), SwitchType::PullUp),
         Switch::new(pins[SwitchB].into_float(), SwitchType::PullUp),
         Switch::new(pins[SwitchX].into_float(), SwitchType::PullUp),
@@ -198,7 +198,7 @@ pub fn build_gamepad(pins: &[arduino_hal::port::Pin; 16]) -> [Switch] {
         Switch::new(pins[SwitchDown].into_float(), SwitchType::PullUp),
         Switch::new(pins[SwitchLeft].into_float(), SwitchType::PullUp),
         Switch::new(pins[SwitchRight].into_float(), SwitchType::PullUp),
-    };
+    ];
     return switches;
 }
 

@@ -52,8 +52,8 @@ fn checkModeChange (
     buttons: &[Switch<T>], 
     mode: &InputMode, 
     changed: &bool, 
-    redlight: &arduino_hal::port::Pin<arduino_hal::port::Pin::mode::Output>, 
-    bluelight: &arduino_hal::port::Pin<arduino_hal::port::Pin::mode::Output>
+    redlight: &arduino_hal::port::Pin<arduino_hal::port::mode::Output>, 
+    bluelight: &arduino_hal::port::Pin<arduino_hal::port::mode::Output>
 ) -> InputMode {
     if !changed && *buttons[switches::SwitchSHIFT].is_pressed() && *buttons[switches::SwitchHome].is_pressed() {
         match mode {
