@@ -5,6 +5,24 @@ use arduino_hal;
 use crate::report;
 // use report::KeyData;
 
+// Define the array offsets for each switch
+pub const SwitchA: u8 = 0;
+pub const SwitchB: u8 = 1;
+pub const SwitchX: u8 = 2;
+pub const SwitchY: u8 = 3;
+pub const SwitchL1: u8 = 4;
+pub const SwitchR1: u8 = 5;
+pub const SwitchL2: u8 = 6;
+pub const SwitchR2: u8 = 7;
+pub const SwitchSelect: u8 = 8;
+pub const SwitchStart: u8 = 9;
+pub const SwitchHome: u8 = 10;
+pub const SwitchShift: u8 = 11;
+pub const SwitchUp: u8 = 12;
+pub const SwitchDown: u8 = 13;
+pub const SwitchLeft: u8 = 14;
+pub const SwitchRight: u8 = 15;
+
 /// If the switch is a pull-up or pull-down type
 pub enum SwitchType {
     PullUp,
@@ -160,52 +178,32 @@ where
     }
 }
 
-// no nested structs, they say I'm a bad developer
-pub struct GamePad {
-    SwitchA: struct Switch,
-    SwitchB: struct Switch,
-    SwitchX: struct Switch,
-    SwitchY: struct Switch,
-    SwitchL1: struct Switch,
-    SwitchR1: struct Switch,
-    SwitchL2: struct Switch,
-    SwitchR2: struct Switch,
-    SwitchSelect: struct Switch,
-    SwitchStart: struct Switch,
-    SwitchHome: struct Switch,
-    SwitchShift: struct Switch,
-    SwitchUp: struct Switch,
-    SwitchDown: struct Switch,
-    SwitchLeft: struct Switch,
-    SwitchRight: struct Switch,
-}
-
 // @TODO the remaining functions in this file should be a trait implemented for GamePad
 // Write the constructor for the gamepad's switches
-pub fn build_gamepad(pins: &[arduino_hal::port::Pin; 16]) -> GamePad {
-    let mut switches = GamePad {
-        SwitchA: Switch::new(pins[0].into_float(), SwitchType::PullUp),
-        SwitchB: Switch::new(pins[1].into_float(), SwitchType::PullUp),
-        SwitchX: Switch::new(pins[2].into_float(), SwitchType::PullUp),
-        SwitchY: Switch::new(pins[3].into_float(), SwitchType::PullUp),
-        SwitchL1: Switch::new(pins[4].into_float(), SwitchType::PullUp),
-        SwitchR1: Switch::new(pins[5].into_float(), SwitchType::PullUp),
-        SwitchL2: Switch::new(pins[6].into_float(), SwitchType::PullUp),
-        SwitchR2: Switch::new(pins[7].into_float(), SwitchType::PullUp),
-        SwitchSelect: Switch::new(pins[8].into_float(), SwitchType::PullUp),
-        SwitchStart: Switch::new(pins[9].into_float(), SwitchType::PullUp),
-        SwitchHome: Switch::new(pins[10].into_float(), SwitchType::PullUp),
-        SwitchShift: Switch::new(pins[11].into_float(), SwitchType::PullUp),
-        SwitchUp: Switch::new(pins[12].into_float(), SwitchType::PullUp),
-        SwitchDown: Switch::new(pins[13].into_float(), SwitchType::PullUp),
-        SwitchLeft: Switch::new(pins[14].into_float(), SwitchType::PullUp),
-        SwitchRight: Switch::new(pins[15].into_float(), SwitchType::PullUp),
+pub fn build_gamepad(pins: &[arduino_hal::port::Pin; 16]) -> [Switch] {
+    let mut switches = [Switch] {
+        Switch::new(pins[0].into_float(), SwitchType::PullUp),
+        Switch::new(pins[1].into_float(), SwitchType::PullUp),
+        Switch::new(pins[2].into_float(), SwitchType::PullUp),
+        Switch::new(pins[3].into_float(), SwitchType::PullUp),
+        Switch::new(pins[4].into_float(), SwitchType::PullUp),
+        Switch::new(pins[5].into_float(), SwitchType::PullUp),
+        Switch::new(pins[6].into_float(), SwitchType::PullUp),
+        Switch::new(pins[7].into_float(), SwitchType::PullUp),
+        Switch::new(pins[8].into_float(), SwitchType::PullUp),
+        Switch::new(pins[9].into_float(), SwitchType::PullUp),
+        Switch::new(pins[10].into_float(), SwitchType::PullUp),
+        Switch::new(pins[11].into_float(), SwitchType::PullUp),
+        Switch::new(pins[12].into_float(), SwitchType::PullUp),
+        Switch::new(pins[13].into_float(), SwitchType::PullUp),
+        Switch::new(pins[14].into_float(), SwitchType::PullUp),
+        Switch::new(pins[15].into_float(), SwitchType::PullUp),
     };
     return switches;
 }
 
 // Poll the debouncers and update the gamepad's state
-pub fn poll_debouncers(&mut gamepad_signals: GamePad) {
+pub fn poll_debouncers(gamepad_signals: &[Switch]) {
     for switch in gamepad_signals {
         switch.update();
     }
@@ -213,7 +211,7 @@ pub fn poll_debouncers(&mut gamepad_signals: GamePad) {
 }
 
 // Read the state of the gamepad's switches into the report
-pub fn read_gamepad_switches(&mut gamepad_signals: GamePad) -> report::KeyData {
+pub fn read_gamepad_switches(&mut gamepad_signals: [Switch]) -> report::KeyData {
     for switch in gamepad_signals {
         if switch.is_high() {
             gamepad_signals.report.buttons[switch.pin] = 1;
