@@ -55,22 +55,22 @@ fn checkModeChange (
     redlight: &arduino_hal::port::Pin<arduino_hal::port::mode::Output>, 
     bluelight: &arduino_hal::port::Pin<arduino_hal::port::mode::Output>
 ) -> InputMode {
-    if !changed && *buttons[switches::SwitchShift].is_pressed() && *buttons[switches::SwitchHome].is_pressed() {
+    if !changed && buttons[switches::SwitchShift].is_pressed() && buttons[switches::SwitchHome].is_pressed() {
         match mode {
             Dpad => {
                 mode = &InputMode::Analog;
-                *redlight.set_high();
-                *bluelight.set_high();
+                redlight.set_high();
+                bluelight.set_high();
             },
             Analog => {
                 mode = &InputMode::Smash;
-                *redlight.set_high();
-                *bluelight.set_low();
+                redlight.set_high();
+                bluelight.set_low();
             },
             Smash => {
                 mode = &InputMode::Dpad;
-                *redlight.set_low();
-                *bluelight.set_high();
+                redlight.set_low();
+                bluelight.set_high();
             },
         }
         let changed = true;
@@ -324,7 +324,7 @@ fn main() -> ! {
     let mut changed = false; 
     loop {
         // poll the debouncer
-        let gamepad_signals = switches::poll_debouncers(&mut debouncer, &mut gamepad_signals);
+        let gamepad_signals = switches::poll_debouncers(&mut gamepad_signals);
         // Check for mode changes
         let mode = checkModeChange(&gamepad_signals, &mode, &changed, &redlight, &bluelight);
         // Read what is pressed

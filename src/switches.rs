@@ -1,4 +1,4 @@
-use debouncr::{debounce_8, Debouncer, Edge, Repeat4};
+use debouncr::{debounce_8, Debouncer, Edge, Repeat8};
 // use debouncer::debounce_8;
 // use arduino_hal::port;
 use arduino_hal;
@@ -6,22 +6,22 @@ use crate::report;
 // use report::KeyData;
 
 // Define the array offsets for each switch
-pub static SwitchA: u8 = 0;
-pub static SwitchB: u8 = 1;
-pub static SwitchX: u8 = 2;
-pub static SwitchY: u8 = 3;
-pub static SwitchL1: u8 = 4;
-pub static SwitchR1: u8 = 5;
-pub static SwitchL2: u8 = 6;
-pub static SwitchR2: u8 = 7;
-pub static SwitchSelect: u8 = 8;
-pub static SwitchStart: u8 = 9;
-pub static SwitchHome: u8 = 10;
-pub static SwitchShift: u8 = 11;
-pub static SwitchUp: u8 = 12;
-pub static SwitchDown: u8 = 13;
-pub static SwitchLeft: u8 = 14;
-pub static SwitchRight: u8 = 15;
+pub static SwitchA: usize = 0;
+pub static SwitchB: usize = 1;
+pub static SwitchX: usize = 2;
+pub static SwitchY: usize = 3;
+pub static SwitchL1: usize = 4;
+pub static SwitchR1: usize = 5;
+pub static SwitchL2: usize = 6;
+pub static SwitchR2: usize = 7;
+pub static SwitchSelect: usize = 8;
+pub static SwitchStart: usize = 9;
+pub static SwitchHome: usize = 10;
+pub static SwitchShift: usize = 11;
+pub static SwitchUp: usize = 12;
+pub static SwitchDown: usize = 13;
+pub static SwitchLeft: usize = 14;
+pub static SwitchRight: usize = 15;
 
 /// If the switch is a pull-up or pull-down type
 pub enum SwitchType {
@@ -32,8 +32,8 @@ pub enum SwitchType {
 /// Process state information from a 2 state switch.
 /// [Debouncr](https://github.com/dbrgn/debouncr/) with a 4 sample array is used for debouncing.
 pub struct Switch {
-    pin: T,
-    state: Debouncer<u8, Repeat4>,
+    pin: arduino_hal::port::Pin<arduino_hal::port::mode::Input<arduino_hal::port::mode::Floating>>,
+    state: Debouncer<u8, Repeat8>,
     falling: bool,
     rising: bool,
     switch_type: SwitchType,
@@ -47,13 +47,12 @@ pub struct Switch {
 }
 
 // @TODO change the InputPin type to one that matches avr_hal
-impl<T> Switch
-where
-    T: InputPin,
-    <T as InputPin>::Error: core::fmt::Debug,
-{
+impl Switch {
     /// Create a new Switch.
-    pub fn new(pin: T, switch_type: SwitchType) -> Self {
+    pub fn new(
+        pin: arduino_hal::port::Pin<arduino_hal::port::mode::Input<arduino_hal::port::mode::Floating>>, 
+        switch_type: SwitchType) 
+        -> Self {
         Self {
             pin,
             state: debounce_8(true),
@@ -149,8 +148,8 @@ where
     /// If the switch is pressed
     pub fn is_pressed(&self) -> bool {
         match self.switch_type {
-            SwitchType::PullUp => self.pin.is_low().unwrap(),
-            SwitchType::PullDown => self.pin.is_high().unwrap(),
+            SwitchType::PullUp => self.pin.is_low(),
+            SwitchType::PullDown => self.pin.is_high(),
         }
     }
 
@@ -180,42 +179,32 @@ where
 
 // @TODO the remaining functions in this file should be a trait implemented for GamePad
 // Write the constructor for the gamepad's switches
-pub fn build_gamepad(pins: &[arduino_hal::port::Pin; 16]) -> [Switch] {
+pub fn build_gamepad(pins: &[arduino_hal::port::Pin<arduino_hal::port::mode::Input<arduino_hal::port::mode::Floating>>; 16]) -> [Switch; 16] {
     let mut switch_array = [
-        Switch::new(pins[SwitchA].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchB].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchX].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchY].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchL1].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchR1].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchL2].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchR2].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchSelect].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchStart].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchHome].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchShift].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchUp].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchDown].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchLeft].into_float(), SwitchType::PullUp),
-        Switch::new(pins[SwitchRight].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchA], SwitchType::PullUp),
+        Switch::new(pins[SwitchB], SwitchType::PullUp),
+        Switch::new(pins[SwitchX], SwitchType::PullUp),
+        Switch::new(pins[SwitchY], SwitchType::PullUp),
+        Switch::new(pins[SwitchL1], SwitchType::PullUp),
+        Switch::new(pins[SwitchR1], SwitchType::PullUp),
+        Switch::new(pins[SwitchL2], SwitchType::PullUp),
+        Switch::new(pins[SwitchR2], SwitchType::PullUp),
+        Switch::new(pins[SwitchSelect], SwitchType::PullUp),
+        Switch::new(pins[SwitchStart], SwitchType::PullUp),
+        Switch::new(pins[SwitchHome], SwitchType::PullUp),
+        Switch::new(pins[SwitchShift], SwitchType::PullUp),
+        Switch::new(pins[SwitchUp], SwitchType::PullUp),
+        Switch::new(pins[SwitchDown], SwitchType::PullUp),
+        Switch::new(pins[SwitchLeft], SwitchType::PullUp),
+        Switch::new(pins[SwitchRight], SwitchType::PullUp),
     ];
     return switch_array;
 }
 
 // Poll the debouncers and update the gamepad's state
-pub fn poll_debouncers(gamepad_signals: &[Switch]) {
+pub fn poll_debouncers(gamepad_signals: &[Switch; 16]) -> [Switch; 16] {
     for switch in gamepad_signals {
         switch.update();
     }
-    return gamepad_signals;
-}
-
-// Read the state of the gamepad's switches into the report
-pub fn read_gamepad_switches(&mut gamepad_signals: [Switch]) -> report::KeyData {
-    for switch in gamepad_signals {
-        if switch.is_high() {
-            gamepad_signals.report.buttons[switch.pin] = 1;
-        }
-    }
-    return gamepad_signals;
+    return *gamepad_signals;
 }
