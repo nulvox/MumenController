@@ -2,8 +2,6 @@ use debouncr::{debounce_8, Debouncer, Edge, Repeat8};
 // use debouncer::debounce_8;
 // use arduino_hal::port;
 use arduino_hal;
-use crate::report;
-// use report::KeyData;
 
 // Define the array offsets for each switch
 pub static SwitchA: usize = 0;
