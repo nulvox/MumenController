@@ -11,26 +11,6 @@ mod report;
 use report::KeyData;
 pub mod switches;
 use switches::Switch;
-// use switches::{
-//     Switch, 
-//     SwitchA, 
-//     SwitchB, 
-//     SwitchX, 
-//     SwitchY, 
-//     SwitchL1, 
-//     SwitchR1, 
-//     SwitchL2, 
-//     SwitchR2, 
-//     SwitchSelect, 
-//     SwitchStart, 
-//     SwitchHome, 
-//     SwitchShift,
-//     SwitchUp,
-//     SwitchDown, 
-//     SwitchLeft, 
-//     SwitchRight
-// };
-
 
 // Set bounce time in ms
 static BOUNCE_TIME: u16 = 1;
@@ -69,13 +49,13 @@ enum InputMode {
 
 // Swap Input mode by pressing HOME and SHIFT
 fn checkModeChange (
-    buttons: &[Switch], 
+    buttons: &[Switch<T>], 
     mode: &InputMode, 
     changed: &bool, 
-    redlight: &arduino_hal::port::Pin<mode::Output>, 
-    bluelight: &arduino_hal::port::Pin<mode::Output>
+    redlight: &arduino_hal::port::Pin<arduino_hal::port::Pin::mode::Output>, 
+    bluelight: &arduino_hal::port::Pin<arduino_hal::port::Pin::mode::Output>
 ) -> InputMode {
-    if !changed && *buttons[SwitchSHIFT].is_pressed() && *buttons[SwitchHome].is_pressed() {
+    if !changed && *buttons[switches::SwitchSHIFT].is_pressed() && *buttons[switches::SwitchHome].is_pressed() {
         match mode {
             Dpad => {
                 mode = &InputMode::Analog;
@@ -101,67 +81,67 @@ fn checkModeChange (
     }
 }
 
-fn processSmash(buttons: &[Switch], stickreport: &report::KeyData) -> report::KeyData {
+fn processSmash(buttons: &[Switch<T>], stickreport: &report::KeyData) -> report::KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes half values
-    if buttons[SwitchShift].is_pressed() {
-        if buttons[SwitchUp].is_pressed() {
+    if buttons[switches::SwitchShift].is_pressed() {
+        if buttons[switches::SwitchUp].is_pressed() {
             stickreport.ly = 192;
-        } else if buttons[SwitchDown].is_pressed() {
+        } else if buttons[switches::SwitchDown].is_pressed() {
             stickreport.ly = 64;
         }
-        if buttons[SwitchLeft].is_pressed() {
+        if buttons[switches::SwitchLeft].is_pressed() {
             stickreport.lx = 64;
-        } else if buttons[SwitchRight].is_pressed() {
+        } else if buttons[switches::SwitchRight].is_pressed() {
             stickreport.lx = 192;
         }
     } else { // report max values for axies
-        if buttons[SwitchUp].is_pressed() {
+        if buttons[switches::SwitchUp].is_pressed() {
             stickreport.ly = 255;
-        } else if buttons[SwitchDown].is_pressed() {
+        } else if buttons[switches::SwitchDown].is_pressed() {
             stickreport.ly = 0;
         }
-        if buttons[SwitchLeft].is_pressed() {
+        if buttons[switches::SwitchLeft].is_pressed() {
             stickreport.lx = 0;
-        } else if buttons[SwitchRight].is_pressed() {
+        } else if buttons[switches::SwitchRight].is_pressed() {
             stickreport.lx = 255;
         }
     }
     return *stickreport;
 }
 
-fn processAnalog(buttons: &[Switch], stickreport: &KeyData) -> KeyData {
+fn processAnalog(buttons: &[Switch<T>], stickreport: &KeyData) -> KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes the input register right stick
-    if buttons[SwitchShift].is_pressed() {
-        if buttons[SwitchUp].is_pressed() {
+    if buttons[switches::SwitchShift].is_pressed() {
+        if buttons[switches::SwitchUp].is_pressed() {
             stickreport.ry = 255;
-        } else if buttons[SwitchDown].is_pressed() {
+        } else if buttons[switches::SwitchDown].is_pressed() {
             stickreport.ry = 0;
         }
-        if buttons[SwitchLeft].is_pressed() {
+        if buttons[switches::SwitchLeft].is_pressed() {
             stickreport.rx = 0;
-        } else if buttons[SwitchRight].is_pressed() {
+        } else if buttons[switches::SwitchRight].is_pressed() {
             stickreport.rx = 255;
         }
     } else {
-        if buttons[SwitchUp].is_pressed() {
+        if buttons[switches::SwitchUp].is_pressed() {
             stickreport.ly = 255;
-        } else if buttons[SwitchDown].is_pressed() {
+        } else if buttons[switches::SwitchDown].is_pressed() {
             stickreport.ly = 0;
         }
-        if buttons[SwitchLeft].is_pressed() {
+        if buttons[switches::SwitchLeft].is_pressed() {
             stickreport.lx = 0;
-        } else if buttons[SwitchRight].is_pressed() {
+        } else if buttons[switches::SwitchRight].is_pressed() {
             stickreport.lx = 255;
         }
     }
     return *stickreport;
 }
 
-fn processDpad(buttons: &[Switch], stickreport: &KeyData) -> KeyData {
+fn processDpad(buttons: &[Switch<T>], stickreport: &KeyData) -> KeyData {
     // Dpad modes don't change the analog state
     // Treat the directions as digital input
     // shift makes the input register SOCD... ish
@@ -172,19 +152,19 @@ fn processDpad(buttons: &[Switch], stickreport: &KeyData) -> KeyData {
     // Shift first negates left and right when up or down is pressed
     // Next, it negates up if left and right were not present
     // Then it changes Down to UP if present.
-    if buttons[SwitchShift].is_pressed() {
-        if buttons[SwitchUp].is_pressed() {
-            if buttons[SwitchLeft].is_pressed() {
+    if buttons[switches::SwitchShift].is_pressed() {
+        if buttons[switches::SwitchUp].is_pressed() {
+            if buttons[switches::SwitchLeft].is_pressed() {
                 stickreport.hat = PAD_MASK_UP;
-            } else if buttons[SwitchRight].is_pressed() {
+            } else if buttons[switches::SwitchRight].is_pressed() {
                 stickreport.hat = PAD_MASK_UP;
             } else {
                 stickreport.hat = PAD_MASK_NONE;
             }
-        } else if buttons[SwitchDown].is_pressed() {
-            if buttons[SwitchLeft].is_pressed() {
+        } else if buttons[switches::SwitchDown].is_pressed() {
+            if buttons[switches::SwitchLeft].is_pressed() {
                 stickreport.hat = PAD_MASK_DOWN;
-            } else if buttons[SwitchRight].is_pressed() {
+            } else if buttons[switches::SwitchRight].is_pressed() {
                 stickreport.hat = PAD_MASK_DOWN;
             } else {
                 stickreport.hat = PAD_MASK_UP;
@@ -194,25 +174,25 @@ fn processDpad(buttons: &[Switch], stickreport: &KeyData) -> KeyData {
         }
     // Without Shift pressed, the directions are normal
     } else {
-        if buttons[SwitchUp].is_pressed() {
-            if buttons[SwitchLeft].is_pressed() {
+        if buttons[switches::SwitchUp].is_pressed() {
+            if buttons[switches::SwitchLeft].is_pressed() {
                 stickreport.hat = PAD_MASK_UPLEFT;
-            } else if buttons[SwitchRight].is_pressed() {
+            } else if buttons[switches::SwitchRight].is_pressed() {
                 stickreport.hat = PAD_MASK_UPRIGHT;
             } else {
                 stickreport.hat = PAD_MASK_UP;
             }
-        } else if buttons[SwitchDown].is_pressed() {
-            if buttons[SwitchLeft].is_pressed() {
+        } else if buttons[switches::SwitchDown].is_pressed() {
+            if buttons[switches::SwitchLeft].is_pressed() {
                 stickreport.hat = PAD_MASK_DOWNLEFT;
-            } else if buttons[SwitchRight].is_pressed() {
+            } else if buttons[switches::SwitchRight].is_pressed() {
                 stickreport.hat = PAD_MASK_DOWNRIGHT;
             } else {
                 stickreport.hat = PAD_MASK_DOWN;
             }
-        } else if buttons[SwitchLeft].is_pressed() {
+        } else if buttons[switches::SwitchLeft].is_pressed() {
             stickreport.hat = PAD_MASK_LEFT;
-        } else if buttons[SwitchRight].is_pressed() {
+        } else if buttons[switches::SwitchRight].is_pressed() {
             stickreport.hat = PAD_MASK_RIGHT;
         } else {
             stickreport.hat = PAD_MASK_NONE;
@@ -221,7 +201,7 @@ fn processDpad(buttons: &[Switch], stickreport: &KeyData) -> KeyData {
     return *stickreport;
 }
 
-fn buttonRead(signals: &[Switch], mode: InputMode) -> KeyData {
+fn buttonRead(signals: &[Switch<T>], mode: InputMode) -> KeyData {
     // Set the report content
     let mut stickreport = KeyData {
         buttons: MASK_NONE,
@@ -241,37 +221,37 @@ fn buttonRead(signals: &[Switch], mode: InputMode) -> KeyData {
 
     // read buttons
     // if button is pressed, set the bit
-    if signals[SwitchA.is_high() {
+    if signals[switches::SwitchA].is_high() {
         stickreport.buttons |= MASK_A;
     }
-    if signals[SwitchB.is_high() {
+    if signals[switches::SwitchB].is_high() {
         stickreport.buttons |= MASK_B;
     }
-    if signals[SwitchX.is_high() {
+    if signals[switches::SwitchX].is_high() {
         stickreport.buttons |= MASK_X;
     }
-    if signals[SwitchY.is_high() {
+    if signals[switches::SwitchY].is_high() {
         stickreport.buttons |= MASK_Y;
     }
-    if signals[SwitchL1.is_high() {
+    if signals[switches::SwitchL1].is_high() {
         stickreport.buttons |= MASK_R1;
     }
-    if signals[SwitchR1.is_high() {
+    if signals[switches::SwitchR1].is_high() {
         stickreport.buttons |= MASK_R2;
     }
-    if signals[SwitchL2.is_high() {
+    if signals[switches::SwitchL2].is_high() {
         stickreport.buttons |= MASK_L1;
     }
-    if signals[SwitchR2.is_high() {
+    if signals[switches::SwitchR2].is_high() {
         stickreport.buttons |= MASK_L2;
     }
-    if signals[SwitchSelect.is_high() {
+    if signals[switches::SwitchSelect].is_high() {
         stickreport.buttons |= MASK_HOME;
     }
-    if signals[SwitchStart.is_high() {
+    if signals[switches::SwitchStart].is_high() {
         stickreport.buttons |= MASK_SELECT;
     }
-    if signals[SwitchHome.is_high() {
+    if signals[switches::SwitchHome].is_high() {
         stickreport.buttons |= MASK_START;
     }
     return stickreport;

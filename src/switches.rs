@@ -6,22 +6,22 @@ use crate::report;
 // use report::KeyData;
 
 // Define the array offsets for each switch
-pub const SwitchA: u8 = 0;
-pub const SwitchB: u8 = 1;
-pub const SwitchX: u8 = 2;
-pub const SwitchY: u8 = 3;
-pub const SwitchL1: u8 = 4;
-pub const SwitchR1: u8 = 5;
-pub const SwitchL2: u8 = 6;
-pub const SwitchR2: u8 = 7;
-pub const SwitchSelect: u8 = 8;
-pub const SwitchStart: u8 = 9;
-pub const SwitchHome: u8 = 10;
-pub const SwitchShift: u8 = 11;
-pub const SwitchUp: u8 = 12;
-pub const SwitchDown: u8 = 13;
-pub const SwitchLeft: u8 = 14;
-pub const SwitchRight: u8 = 15;
+pub static SwitchA: u8 = 0;
+pub static SwitchB: u8 = 1;
+pub static SwitchX: u8 = 2;
+pub static SwitchY: u8 = 3;
+pub static SwitchL1: u8 = 4;
+pub static SwitchR1: u8 = 5;
+pub static SwitchL2: u8 = 6;
+pub static SwitchR2: u8 = 7;
+pub static SwitchSelect: u8 = 8;
+pub static SwitchStart: u8 = 9;
+pub static SwitchHome: u8 = 10;
+pub static SwitchShift: u8 = 11;
+pub static SwitchUp: u8 = 12;
+pub static SwitchDown: u8 = 13;
+pub static SwitchLeft: u8 = 14;
+pub static SwitchRight: u8 = 15;
 
 /// If the switch is a pull-up or pull-down type
 pub enum SwitchType {
@@ -181,23 +181,23 @@ where
 // @TODO the remaining functions in this file should be a trait implemented for GamePad
 // Write the constructor for the gamepad's switches
 pub fn build_gamepad(pins: &[arduino_hal::port::Pin; 16]) -> [Switch] {
-    let mut switches = [Switch] {
-        Switch::new(pins[0].into_float(), SwitchType::PullUp),
-        Switch::new(pins[1].into_float(), SwitchType::PullUp),
-        Switch::new(pins[2].into_float(), SwitchType::PullUp),
-        Switch::new(pins[3].into_float(), SwitchType::PullUp),
-        Switch::new(pins[4].into_float(), SwitchType::PullUp),
-        Switch::new(pins[5].into_float(), SwitchType::PullUp),
-        Switch::new(pins[6].into_float(), SwitchType::PullUp),
-        Switch::new(pins[7].into_float(), SwitchType::PullUp),
-        Switch::new(pins[8].into_float(), SwitchType::PullUp),
-        Switch::new(pins[9].into_float(), SwitchType::PullUp),
-        Switch::new(pins[10].into_float(), SwitchType::PullUp),
-        Switch::new(pins[11].into_float(), SwitchType::PullUp),
-        Switch::new(pins[12].into_float(), SwitchType::PullUp),
-        Switch::new(pins[13].into_float(), SwitchType::PullUp),
-        Switch::new(pins[14].into_float(), SwitchType::PullUp),
-        Switch::new(pins[15].into_float(), SwitchType::PullUp),
+    let mut switches = [Switch<T>] {
+        Switch::new(pins[SwitchA].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchB].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchX].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchY].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchL1].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchR1].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchL2].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchR2].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchSelect].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchStart].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchHome].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchShift].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchUp].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchDown].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchLeft].into_float(), SwitchType::PullUp),
+        Switch::new(pins[SwitchRight].into_float(), SwitchType::PullUp),
     };
     return switches;
 }
