@@ -31,7 +31,7 @@ pub enum SwitchType {
 
 /// Process state information from a 2 state switch.
 /// [Debouncr](https://github.com/dbrgn/debouncr/) with a 4 sample array is used for debouncing.
-pub struct Switch<T> {
+pub struct Switch {
     pin: T,
     state: Debouncer<u8, Repeat4>,
     falling: bool,
@@ -47,7 +47,7 @@ pub struct Switch<T> {
 }
 
 // @TODO change the InputPin type to one that matches avr_hal
-impl<T> Switch<T>
+impl<T> Switch
 where
     T: InputPin,
     <T as InputPin>::Error: core::fmt::Debug,
@@ -181,7 +181,7 @@ where
 // @TODO the remaining functions in this file should be a trait implemented for GamePad
 // Write the constructor for the gamepad's switches
 pub fn build_gamepad(pins: &[arduino_hal::port::Pin; 16]) -> [Switch] {
-    let mut switches = [
+    let mut switch_array = [
         Switch::new(pins[SwitchA].into_float(), SwitchType::PullUp),
         Switch::new(pins[SwitchB].into_float(), SwitchType::PullUp),
         Switch::new(pins[SwitchX].into_float(), SwitchType::PullUp),
@@ -199,7 +199,7 @@ pub fn build_gamepad(pins: &[arduino_hal::port::Pin; 16]) -> [Switch] {
         Switch::new(pins[SwitchLeft].into_float(), SwitchType::PullUp),
         Switch::new(pins[SwitchRight].into_float(), SwitchType::PullUp),
     ];
-    return switches;
+    return switch_array;
 }
 
 // Poll the debouncers and update the gamepad's state

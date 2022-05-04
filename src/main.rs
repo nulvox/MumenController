@@ -49,7 +49,7 @@ enum InputMode {
 
 // Swap Input mode by pressing HOME and SHIFT
 fn checkModeChange (
-    buttons: &[Switch<T>], 
+    buttons: &[Switch], 
     mode: &InputMode, 
     changed: &bool, 
     redlight: &arduino_hal::port::Pin<arduino_hal::port::mode::Output>, 
@@ -81,7 +81,7 @@ fn checkModeChange (
     }
 }
 
-fn processSmash(buttons: &[Switch<T>], stickreport: &report::KeyData) -> report::KeyData {
+fn processSmash(buttons: &[Switch], stickreport: &report::KeyData) -> report::KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes half values
@@ -111,7 +111,7 @@ fn processSmash(buttons: &[Switch<T>], stickreport: &report::KeyData) -> report:
     return *stickreport;
 }
 
-fn processAnalog(buttons: &[Switch<T>], stickreport: &KeyData) -> KeyData {
+fn processAnalog(buttons: &[Switch], stickreport: &KeyData) -> KeyData {
     // Analog modes don't change the dpad state
     // Treat the directions as analog input
     // shift makes the input register right stick
@@ -141,7 +141,7 @@ fn processAnalog(buttons: &[Switch<T>], stickreport: &KeyData) -> KeyData {
     return *stickreport;
 }
 
-fn processDpad(buttons: &[Switch<T>], stickreport: &KeyData) -> KeyData {
+fn processDpad(buttons: &[Switch], stickreport: &KeyData) -> KeyData {
     // Dpad modes don't change the analog state
     // Treat the directions as digital input
     // shift makes the input register SOCD... ish
@@ -201,7 +201,7 @@ fn processDpad(buttons: &[Switch<T>], stickreport: &KeyData) -> KeyData {
     return *stickreport;
 }
 
-fn buttonRead(signals: &[Switch<T>], mode: InputMode) -> KeyData {
+fn buttonRead(signals: &[Switch], mode: InputMode) -> KeyData {
     // Set the report content
     let mut stickreport = KeyData {
         buttons: MASK_NONE,
