@@ -26,7 +26,7 @@ pub struct PadReport {
 impl PadReport {
     pub fn new(btnstate: &KeyData) -> Self {
         let btnarray = btnstate.buttons.to_be_bytes();
-        HidReport { 
+        PadReport { 
             bytes: [ 
                 btnarray[0], 
                 btnarray[1], 
