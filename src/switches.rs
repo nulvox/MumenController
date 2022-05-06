@@ -4,40 +4,59 @@ use debouncr::{debounce_8, Debouncer, Edge, Repeat8};
 use arduino_hal;
 
 // Define the array offsets for each switch
-pub static SwitchA: usize = 0;
-pub static SwitchB: usize = 1;
-pub static SwitchX: usize = 2;
-pub static SwitchY: usize = 3;
-pub static SwitchL1: usize = 4;
-pub static SwitchR1: usize = 5;
-pub static SwitchL2: usize = 6;
-pub static SwitchR2: usize = 7;
-pub static SwitchSelect: usize = 8;
-pub static SwitchStart: usize = 9;
-pub static SwitchHome: usize = 10;
-pub static SwitchShift: usize = 11;
-pub static SwitchUp: usize = 12;
-pub static SwitchDown: usize = 13;
-pub static SwitchLeft: usize = 14;
-pub static SwitchRight: usize = 15;
+pub static SWITCH_A: usize = 0;
+pub static SWITCH_B: usize = 1;
+pub static SWITCH_X: usize = 2;
+pub static SWITCH_Y: usize = 3;
+pub static SWITCH_L1: usize = 4;
+pub static SWITCH_R1: usize = 5;
+pub static SWITCH_L2: usize = 6;
+pub static SWITCH_R2: usize = 7;
+pub static SWITCH_SELECT: usize = 8;
+pub static SWITCH_START: usize = 9;
+pub static SWITCH_HOME: usize = 10;
+pub static SWITCH_SHIFT: usize = 11;
+pub static SWITCH_UP: usize = 12;
+pub static SWITCH_DOWN: usize = 13;
+pub static SWITCH_LEFT: usize = 14;
+pub static SWITCH_RIGHT: usize = 15;
 
 /// If the switch is a pull-up or pull-down type
+#[derive(Debug, Copy, Clone)]
 pub enum SwitchType {
     PullUp,
     PullDown,
 }
 
+pub enum ButtonName {
+    ButtonA,
+    ButtonB,
+    ButtonX,
+    ButtonY,
+    ButtonL1,
+    ButtonR1,
+    ButtonL2,
+    ButtonR2,
+    ButtonSelect,
+    ButtonStart,
+    ButtonHome,
+    ButtonShift,
+    ButtonUp,
+    ButtonDown,
+    ButtonLeft,
+    ButtonRight,
+}
+
 /// Process state information from a 2 state switch.
 /// [Debouncr](https://github.com/dbrgn/debouncr/) with a 4 sample array is used for debouncing.
 pub struct Switch {
-    pin: arduino_hal::port::Pin<arduino_hal::port::mode::Input<arduino_hal::port::mode::Floating>>,
+    pin: arduino_hal::port::Pin<arduino_hal::port::mode::Input<arduino_hal::port::mode::PullUp>>,
     state: Debouncer<u8, Repeat8>,
     falling: bool,
     rising: bool,
     switch_type: SwitchType,
     double_threshold: Option<u32>,
     held_threshold: Option<u32>,
-    was_pressed: bool,
     held_counter: u32,
     last_press_counter: u32,
     single_press: bool,
@@ -48,18 +67,38 @@ pub struct Switch {
 impl Switch {
     /// Create a new Switch.
     pub fn new(
-        pin: &arduino_hal::port::Pin<arduino_hal::port::mode::Input<arduino_hal::port::mode::Floating>>, 
+        // pins: &mut arduino_hal::port::Pins,
+        pin_name: ButtonName, 
         switch_type: SwitchType) 
         -> Self {
+        let dp = arduino_hal::Peripherals::take().unwrap();
+        let pins = arduino_hal::pins!(dp);
         Self {
-            pin: *pin.clone(),
+            // This is where you change the pinout for the switches
+            pin: match pin_name {
+                ButtonName::ButtonA => { pins.d3.into_pull_up_input().downgrade() },
+                ButtonName::ButtonB => { pins.a1.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonX => { pins.a0.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonY => { pins.sck.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonL1 => { pins.a1.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonR1 => { pins.d5.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonL2 => { pins.a2.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonR2 => { pins.d0.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonSelect => { pins.miso.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonStart => { pins.d10.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonHome => { pins.mosi.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonShift => { pins.d2.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonUp => { pins.d7.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonDown => { pins.d8.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonLeft => { pins.d6.into_pull_up_input().downgrade() }, 
+                ButtonName::ButtonRight => { pins.d9.into_pull_up_input().downgrade() }
+            },
             state: debounce_8(true),
             falling: false,
             rising: false,
             switch_type,
             double_threshold: None,
             held_threshold: None,
-            was_pressed: false,
             held_counter: 0,
             last_press_counter: 0,
             single_press: false,
@@ -175,34 +214,43 @@ impl Switch {
     }
 }
 
-// @TODO the remaining functions in this file should be a trait implemented for GamePad
+pub fn build_indicators() -> [arduino_hal::port::Pin<arduino_hal::port::mode::Output>; 2] {
+    let dp = arduino_hal::Peripherals::take().unwrap();
+    let pins = arduino_hal::pins!(dp);
+    [
+        pins.a3.into_output().downgrade(), // Red
+        pins.d4.into_output().downgrade(), // Blue
+    ]
+}
+
 // Write the constructor for the gamepad's switches
-pub fn build_gamepad(pins: &[arduino_hal::port::Pin<arduino_hal::port::mode::Input<arduino_hal::port::mode::Floating>>; 16]) -> [Switch; 16] {
-    let switch_array = [
-        Switch::new(&pins[SwitchA], SwitchType::PullUp),
-        Switch::new(&pins[SwitchB], SwitchType::PullUp),
-        Switch::new(&pins[SwitchX], SwitchType::PullUp),
-        Switch::new(&pins[SwitchY], SwitchType::PullUp),
-        Switch::new(&pins[SwitchL1], SwitchType::PullUp),
-        Switch::new(&pins[SwitchR1], SwitchType::PullUp),
-        Switch::new(&pins[SwitchL2], SwitchType::PullUp),
-        Switch::new(&pins[SwitchR2], SwitchType::PullUp),
-        Switch::new(&pins[SwitchSelect], SwitchType::PullUp),
-        Switch::new(&pins[SwitchStart], SwitchType::PullUp),
-        Switch::new(&pins[SwitchHome], SwitchType::PullUp),
-        Switch::new(&pins[SwitchShift], SwitchType::PullUp),
-        Switch::new(&pins[SwitchUp], SwitchType::PullUp),
-        Switch::new(&pins[SwitchDown], SwitchType::PullUp),
-        Switch::new(&pins[SwitchLeft], SwitchType::PullUp),
-        Switch::new(&pins[SwitchRight], SwitchType::PullUp),
-    ];
-    return switch_array;
+pub fn build_gamepad() -> [Switch; 16] {
+    // let dp = arduino_hal::Peripherals::take().unwrap();
+    // let mut pins = arduino_hal::pins!(dp);
+    [
+        Switch::new(ButtonName::ButtonA, SwitchType::PullUp),        // Button A
+        Switch::new(ButtonName::ButtonB, SwitchType::PullUp),        // Button B
+        Switch::new(ButtonName::ButtonX, SwitchType::PullUp),        // Button X
+        Switch::new(ButtonName::ButtonY, SwitchType::PullUp),        // Button Y
+        Switch::new(ButtonName::ButtonL1, SwitchType::PullUp),       // Button L1
+        Switch::new(ButtonName::ButtonR1, SwitchType::PullUp),       // Button R1
+        Switch::new(ButtonName::ButtonL2, SwitchType::PullUp),       // Button L2
+        Switch::new(ButtonName::ButtonR2, SwitchType::PullUp),       // Button R2
+        Switch::new(ButtonName::ButtonSelect, SwitchType::PullUp),   // Button Select
+        Switch::new(ButtonName::ButtonStart, SwitchType::PullUp),    // Button Start
+        Switch::new(ButtonName::ButtonHome, SwitchType::PullUp),     // Button Home
+        Switch::new(ButtonName::ButtonShift, SwitchType::PullUp),    // Button Shift
+        Switch::new(ButtonName::ButtonUp, SwitchType::PullUp),       // Button Up
+        Switch::new(ButtonName::ButtonDown, SwitchType::PullUp),     // Button Down
+        Switch::new(ButtonName::ButtonLeft, SwitchType::PullUp),     // Button Left
+        Switch::new(ButtonName::ButtonRight, SwitchType::PullUp),    // Button Right
+    ]
 }
 
 // Poll the debouncers and update the gamepad's state
-pub fn poll_debouncers(gamepad_signals: &[Switch; 16]) -> [Switch; 16] {
-    for switch in gamepad_signals {
+pub fn poll_debouncers(gamepad_signals: &mut [Switch; 16]) -> &[Switch; 16] {
+    for switch in gamepad_signals.iter_mut() {
         switch.update();
     }
-    return *gamepad_signals;
+    return gamepad_signals;
 }
