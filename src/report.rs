@@ -1,5 +1,6 @@
 use usbd_hid_device::HidReport;
 
+#[derive(Debug, Copy, Clone)]
 pub struct KeyData {
     pub buttons: u16,
     pub hat: u8,
