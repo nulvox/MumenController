@@ -2,11 +2,7 @@
 #![no_main]
 
 use panic_halt as _;
-// use usbd_hid_device::HidReport;
-// use arduino_hal::port;
 use arduino_hal;
-// use debouncr::{debounce_8, Debouncer, Edge, Repeat4};
-// use debouncr::debounce_8;
 mod report;
 use report::KeyData;
 pub mod switches;
