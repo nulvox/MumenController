@@ -25,10 +25,10 @@ install [rustup ](https://rustup.rs/)
 
 [avr-hal](https://github.com/rahix/avr-hal) is a great toolset for getting started in rust on most arduino boards. You rock, Rahix.
 
-[usb-hid-device](https://github.com/agalakhov/usbd-hid-device) wildly accelerated the time it took to learn HID reporting and provides a clean API to work with HID descriptors. I appreciate your work, agalakhov.
+[usb-human-interface-device](https://github.com/dlkj/usbd-human-interface-device) wildly accelerated the time it took to learn HID reporting and provides a clean API to work with HID descriptors. I appreciate your work, dlkj.
 
-[usb-device](https://github.com/rust-embedded-community/usb-device) provides a great framework which usb-hid-device was built on, but it doesn't work on this target out-of-the-box. Thank you, agausmann for your hard work bringing important features of rust to AVR wit projects like [this](https://github.com/agausmann/usb-device/tree/bd5a518dff4a688bed05c67c83fea733b69c9623). Maybe one day the conflicts can be resolved and your PR can be merged.
+[linusdev](https://github.com/linasdev) has a ton of great resources regarding USB on github. Thank you for your strong examples.
 
-[Unflappable](https://github.com/couchand/unflappable) provides nice portable debounced pin objects. It would be nice to have the functionality it needs available in the stable rust. Keep up the great work, couchand.
+[usb-device](https://github.com/rust-embedded-community/usb-device) provides a great framework which usb-hid-device was built on, but it doesn't work on this target out-of-the-box. Thank you, agausmann for your hard work bringing important features of rust to AVR with projects like [this](https://github.com/agausmann/usb-device/tree/bd5a518dff4a688bed05c67c83fea733b69c9623). Maybe one day the conflicts can be resolved and your PR can be merged.
 
 I'd also like to thank the Embedded Rust community as a whole. I stand on the shoulders of giants. Check out [Awesome Embedded Rust](https://github.com/rust-embedded/awesome-embedded-rust) for more great projects to follow.

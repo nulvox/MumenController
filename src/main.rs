@@ -272,6 +272,31 @@ fn main() -> ! {
     indicators[1].set_high(); // Turn on the Blue LED
     let _mode = InputMode::Dpad;
     let mut _changed = false; 
+
+    // Set up the USB interface
+        //USB
+        let usb_bus = UsbBusAllocator::new(hal::usb::UsbBus::new(
+            pac.USBCTRL_REGS,
+            pac.USBCTRL_DPRAM,
+            clocks.usb_clock,
+            true,
+            &mut pac.RESETS,
+        ));
+    
+        let mut fightstick = UsbHidClassBuilder::new()
+            .add_interface(
+                usbd_human_interface_device::device::switch_gamepad::SwitchGamepadInterface::default_config(),
+            )
+            .build(&usb_bus);
+    
+        //https://pid.codes
+        let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1209, 0x0001))
+            .manufacturer("Me... I made it...")
+            .product("Mumen Controller")
+            .serial_number("breakfast5")
+            .supports_remote_wakeup(false)
+            .build();
+
     loop {
         // poll the debouncer
         let gamepad_signals = switches::poll_debouncers(&mut gamepad_signals);
@@ -283,6 +308,7 @@ fn main() -> ! {
         // Read what is pressed
         let buttonstate = button_read(gamepad_signals, _mode);
         // Update the USB HID report
-        shipit(&buttonstate);
+        // shipit(&buttonstate);
+        fightstick.interface().write_report(&buttonstate);
     }
 }
