@@ -7,6 +7,7 @@ mod report;
 use report::KeyData;
 pub mod switches;
 use switches::Switch;
+use usbd_hid;
 
 // Button state masks
 static MASK_A: u16 = 0x0004;
@@ -283,19 +284,26 @@ fn main() -> ! {
             &mut pac.RESETS,
         ));
     
-        let mut fightstick = UsbHidClassBuilder::new()
-            .add_interface(
-                usbd_human_interface_device::device::switch_gamepad::SwitchGamepadInterface::default_config(),
-            )
-            .build(&usb_bus);
+        // let mut fightstick = UsbHidClassBuilder::new()
+        //     .add_interface(
+        //         usbd_human_interface_device::device::switch_gamepad::SwitchGamepadInterface::default_config(),
+        //     )
+        //     .build(&usb_bus);
     
-        //https://pid.codes
-        let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1209, 0x0001))
-            .manufacturer("Me... I made it...")
-            .product("Mumen Controller")
-            .serial_number("breakfast5")
-            .supports_remote_wakeup(false)
-            .build();
+        // //https://pid.codes
+        // let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1209, 0x0001))
+        //     .manufacturer("Me... I made it...")
+        //     .product("Mumen Controller")
+        //     .serial_number("breakfast5")
+        //     .supports_remote_wakeup(false)
+        //     .build();
+        let settings = usbd_hid::hid_class::HidClassSettings {
+            subclass: usbd_hid::hid_class::HidSubClass::NoSubClass,
+            protocol: usbd_hid::hid_class::HidProtocol::Generic,
+            config: usbd_hid::hid_class::ProtocolModeCOnfig::ForeceReport,
+            locale: usbd_hid::hid_class::HidCountryCode::US,
+        };
+        let mut fightstick = usbd_hid::hid_class::HIDClass::new_ep_in_with_settings(&usb_bus, &report::DESCRIPTOR, 5, settings);
 
     loop {
         // poll the debouncer
@@ -309,6 +317,6 @@ fn main() -> ! {
         let buttonstate = button_read(gamepad_signals, _mode);
         // Update the USB HID report
         // shipit(&buttonstate);
-        fightstick.interface().write_report(&buttonstate);
+        // fightstick.interface().write_report(&buttonstate);
     }
 }

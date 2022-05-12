@@ -1,3 +1,4 @@
+cargo-features = ["resolver"]
 [build]
 target = "avr-specs/avr-atmega32u4-softatomic.json"
 # rustflags = "--emit=obj"
