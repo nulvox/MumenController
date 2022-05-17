@@ -6,7 +6,10 @@ use arduino_hal;
 mod report;
 use report::KeyData;
 pub mod switches;
+// use usb_device::class_prelude::UsbBus;
+use usb_device;
 use switches::Switch;
+use usb_device::prelude::UsbDeviceBuilder;
 use usbd_hid;
 
 // Button state masks
@@ -275,35 +278,54 @@ fn main() -> ! {
     let mut _changed = false; 
 
     // Set up the USB interface
-        //USB
-        let usb_bus = UsbBusAllocator::new(hal::usb::UsbBus::new(
-            pac.USBCTRL_REGS,
-            pac.USBCTRL_DPRAM,
-            clocks.usb_clock,
-            true,
-            &mut pac.RESETS,
-        ));
-    
-        // let mut fightstick = UsbHidClassBuilder::new()
-        //     .add_interface(
-        //         usbd_human_interface_device::device::switch_gamepad::SwitchGamepadInterface::default_config(),
+    //USB
+    // let usb_bus =  usb_device::bus::UsbBusAllocator::new(hal::usb::UsbBus::new(
+    //     pac.USBCTRL_REGS,
+    //     pac.USBCTRL_DPRAM,
+    //     clocks.usb_clock,
+    //     true,
+    //     &mut pac.RESETS,
+    // ));
+    const QUIRK_SET_ADDRESS_BEFORE_STATUS: bool = true;
+    // let mut usb_bus = switches::FightStick::new();
+    // let mut usb_bus = 
+     // let mut fightstick = UsbHidClassBuilder::new()
+    //     .add_interface(
+    //         usbd_human_interface_device::device::switch_gamepad::SwitchGamepadInterface::default_config(),
+    //     )
+    //     .build(&usb_bus);
+            // let mut bus = usb_device::bus::UsbBusAllocator::new(
+        //     usb_device::bus::UsbBus::alloc_ep(
+        //         &bus,
+        //         usb_device::UsbDirection::In,
+        //         // Option<EndpointAddress>,
+        //         // None,  to get autoassigned by implementation
+        //         Option<usb_device::endpoint::EndpointAddress::from_parts(
+        //             0,
+        //             usb_device::UsbDirection::In
+        //         )>,
+        //         // Update program to read buttons and send reports from an ISR and 
+        //         //  change this to Interrupt
+        //         usb_device::endpoint::EndpointType::Bulk,
+        //         16,
+        //         // Adjust polling below if enabling interrupts
+        //         0
         //     )
-        //     .build(&usb_bus);
-    
-        // //https://pid.codes
-        // let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1209, 0x0001))
-        //     .manufacturer("Me... I made it...")
-        //     .product("Mumen Controller")
-        //     .serial_number("breakfast5")
-        //     .supports_remote_wakeup(false)
-        //     .build();
-        let settings = usbd_hid::hid_class::HidClassSettings {
-            subclass: usbd_hid::hid_class::HidSubClass::NoSubClass,
-            protocol: usbd_hid::hid_class::HidProtocol::Generic,
-            config: usbd_hid::hid_class::ProtocolModeCOnfig::ForeceReport,
-            locale: usbd_hid::hid_class::HidCountryCode::US,
-        };
-        let mut fightstick = usbd_hid::hid_class::HIDClass::new_ep_in_with_settings(&usb_bus, &report::DESCRIPTOR, 5, settings);
+        // );
+     // //https://pid.codes
+    let mut fightstick = UsbDeviceBuilder::new(fightstick, UsbVidPid(0x1209, 0x0001))
+        .manufacturer("Me... I made it...")
+        .product("Mumen Controller")
+        .serial_number("breakfast5")
+        .supports_remote_wakeup(false)
+        .build();
+    let settings = usbd_hid::hid_class::HidClassSettings {
+        subclass: usbd_hid::hid_class::HidSubClass::NoSubClass,
+        protocol: usbd_hid::hid_class::HidProtocol::Generic,
+        config: usbd_hid::hid_class::ProtocolModeConfig::ForceReport,
+        locale: usbd_hid::hid_class::HidCountryCode::US,
+    };
+    // let mut fightstick = usbd_hid::hid_class::HIDClass::new_ep_in_with_settings(&usb_bus, &report::DESCRIPTOR, 5, settings);
 
     loop {
         // poll the debouncer

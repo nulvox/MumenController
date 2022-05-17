@@ -45,6 +45,100 @@ pub enum ButtonName {
     ButtonRight,
 }
 
+// Implement the atmega32u4 usb bus
+// #[derive(usb_device::bus::UsbBus)]
+pub struct FightStick {
+    // It needs fields...
+}
+
+// impl usb_device::bus::UsbBus for Fightstick
+impl usb_device::bus::UsbBus for FightStick {
+    // implement driver
+    fn alloc_ep(
+        &mut self,
+        ep_dir: UsbDirection,
+        ep_addr: Option<usb_device::endpoint::EndpointAddress>,
+        ep_type: usb_device::endpoint::EndpointType,
+        max_packet_size: u16,
+        interval: u8
+    ) -> Result<usb_device::endpoint::EndpointAddress,usb_device::UsbError> {
+// Allocates an endpoint and specified endpoint parameters. 
+// This method is called by the device and class implementations 
+// to allocate endpoints, and can only be called before enable is called.
+        Err<usb_device::UsbError>
+    }
+
+    fn enable(&mut self){
+        //enable the endpoint
+    }
+
+    fn reset(&self){
+        //reset interface
+    }
+
+    fn set_device_address(&self, addr: u8){
+        //set addr
+    }
+
+    fn write(&self, ep_addr: usb_device::endpoint::EndpointAddress, buf: &[u8]) -> Result<usize,usb_device::UsbError> {
+        // write to the pipe
+        Ok<16>
+    }
+
+    fn read(&self, ep_addr: usb_device::endpoint::EndpointAddress, buf: &mut [u8]) -> Result<usize,usb_device::UsbError> {
+        // read
+        Ok<16>
+    }
+
+    fn set_stalled(&self, ep_addr: usb_device::endpoint::EndpointAddress, stalled: bool) {
+        // mark interface stalled
+    }
+
+    fn is_stalled(&self, ep_addr: usb_device::endpoint::EndpointAddress) -> bool {
+        // check if the interface is stalled
+        true
+    }
+
+    fn suspend(&self) {
+        // suspend the interface 
+    }
+
+    fn resume(&self) {
+        // wake up the interface
+    }
+
+    fn poll(&self) -> usb_device::bus::PollResult{
+        // poll the interface
+        ret usb_device::bus::PollResult<None>
+    }
+
+}
+
+impl FightStick {
+    pub fn new(&'static self) -> &'static Self {
+        // lol, this should do something
+        // let mut bus = usb_device::bus::UsbBusAllocator::new(
+        //     usb_device::bus::UsbBus::alloc_ep(
+        //         &bus,
+        //         usb_device::UsbDirection::In,
+        //         // Option<usb_device::endpoint::EndpointAddress>,
+        //         // None,  to get autoassigned by implementation
+        //         Option<usb_device::endpoint::usb_device::endpoint::EndpointAddress::from_parts(
+        //             0,
+        //             usb_device::UsbDirection::In
+        //         )>,
+        //         // Update program to read buttons and send reports from an ISR and 
+        //         //  change this to Interrupt
+        //         usb_device::endpoint::EndpointType::Bulk,
+        //         16,
+        //         // Adjust polling below if enabling interrupts
+        //         0
+        //     )
+        // );
+        return self;
+    }
+}
+
 /// Process state information from a 2 state switch.
 /// [Debouncr](https://github.com/dbrgn/debouncr/) with a 4 sample array is used for debouncing.
 pub struct Switch {
