@@ -1,3 +1,9 @@
+# MumenController
+This project implements a fight stick firmware to be:
+ * fast
+ * effective
+ * compliant
+ * flexible
 
 # Setup
 
