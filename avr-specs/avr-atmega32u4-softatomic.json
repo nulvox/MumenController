@@ -14,7 +14,7 @@
     "linker": "avr-gcc",
     "linker-is-gnu": true,
     "llvm-target": "avr-unknown-unknown",
-    "max-atomic-width": 16,
+    "max-atomic-width": 8,
     "no-default-libraries": true,
     "pre-link-args": {
       "gcc": [

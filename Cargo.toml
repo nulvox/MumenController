@@ -2,7 +2,7 @@
 name = "mumen-controller"
 version = "0.1.0"
 authors = ["nulvox <38874956+nulvox@users.noreply.github.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [[bin]]
@@ -13,11 +13,10 @@ bench = false
 [dependencies]
 panic-halt = "0.2.0"
 # ufmt = "0.1.0"
-nb = "0.1.2"
 debouncr = "0.2.2"
-usbd-hid-device = "0.1.0"
-usb-device = { git = "https://github.com/agausmann/usb-device.git" }
-arduino-hal = { git = "https://github.com/rahix/avr-hal", rev = "f84c0dff774c2292bc932b670955165161ecc7d1", features= ["arduino-leonardo"] }
+usbd-human-interface-device = { git = "https://github.com/nulvox/usbd-human-interface-device.git", branch = "master" }
+usb-device = "0.2"
+arduino-hal = { git = "https://github.com/rahix/avr-hal", features = ["arduino-leonardo"] }
 
 # Configure the build for minimal size - AVRs have very little program memory
 [profile.dev]
