@@ -38,3 +38,4 @@ install [rustup ](https://rustup.rs/)
 [Unflappable](https://github.com/couchand/unflappable) provides nice portable debounced pin objects. It would be nice to have the functionality it needs available in the stable rust. Keep up the great work, couchand.
 
 I'd also like to thank the Embedded Rust community as a whole. I stand on the shoulders of giants. Check out [Awesome Embedded Rust](https://github.com/rust-embedded/awesome-embedded-rust) for more great projects to follow.
+
