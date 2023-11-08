@@ -17,7 +17,7 @@ install [arduino IDE](https://www.arduino.cc/en/software/)
 
 install [rustup ](https://rustup.rs/)
 
-`rustup set default nightly`
+`rustup default nightly`
 
 `rustup component add nightly rust-src`
 
