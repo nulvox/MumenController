@@ -1,0 +1,27 @@
+---
+Controller:
+  - controllername: a4d17
+    kaylayout:
+      A: [0, 'd', 1],
+      B: [1, 'd', 1],
+      X: [2, 'd', 1],
+      Y: [3, 'd', 1],
+      R1: [5, 'd', 1],
+      R2: [7, 'd', 1],
+      R3: [12, 'd', 1],
+      L1: [4, 'd', 1],
+      L2: [6, 'd', 1],
+      L3: [11, 'd', 1],
+      LX: [17, 'a'],
+      LY: [18, 'a'],
+      RX: [19, 'a'],
+      RY: [20, 'a'],
+      UP: [13, 'd', 1],
+      DOWN: [14, 'd', 1],
+      LEFT: [15, 'd', 1],
+      RIGHT: [16, 'd', 1],
+      START: [9, 'd', 1],
+      SELECT: [8, 'd', 1],
+      HOME: [10, 'd', 1],
+      SCREENSHOT: [],
+      SHIFT: []
