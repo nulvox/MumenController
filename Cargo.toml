@@ -1,12 +1,12 @@
 [package]
-name = "mumen-refactor"
+name = "MumenController"
 version = "0.1.0"
 authors = ["nulvox <38874956+nulvox@users.noreply.github.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [[bin]]
-name = "mumen-refactor"
+name = "MumenController"
 test = false
 bench = false
 
