@@ -1,8 +1,8 @@
 #![no_std]
 #![no_main]
 
-use panic_halt as _;
 use arduino_hal;
+use panic_halt as _;
 
 // Button state masks
 static MASK_A: u16 = 0x0004;
@@ -33,11 +33,9 @@ static PAD_MASK_NONE: u8 = 0x08;
 fn main() -> ! {
     let dp = arduino_hal::Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(dp);
-
-//     let mut led = pins.led_rx.into_output();
-
-//     loop {
-//         led.toggle();
-//         arduino_hal::delay_ms(1000);
-//     }
+    //let mut led = pins.led_rx.into_output();
+    //loop {
+    //         led.toggle();
+    //         arduino_hal::delay_ms(1000);
+    //     }
 }
