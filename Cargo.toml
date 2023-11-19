@@ -49,4 +49,4 @@ lto = true
 opt-level = "s"
 
 [build]
-rustflags = ["--cfg", "portable_atomic_no_outline_atomics", "-Z", "macro-backtrace"]
+rustflags = ["--cfg", "portable_atomic_no_outline_atomics"]

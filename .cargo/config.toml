@@ -3,7 +3,7 @@ target = "avr-specs/avr-atmega32u4.json"
 # rustflags = "--emit=obj"
 
 [target.'cfg(target_arch = "avr")']
-runner = "ravedude leonardo"
+runner = "ravedude sparkfun-promicro"
 
 [unstable]
 build-std = ["core"]
