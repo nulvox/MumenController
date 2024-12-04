@@ -10,6 +10,7 @@ install [rustup ](https://rustup.rs/)
 
 `cargo install toml-fmt cargo-generate`
 
+`cargo objcopy --release -- -O ihex hello-world.hex`
 
 # Old Setup (atmega32u4)
 

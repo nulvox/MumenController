@@ -3,13 +3,24 @@ name = "mumen_controller"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+rtic = { version = "2", features = ["thumbv7-backend"] }
+rtic-monotonics = { version = "1", default-features = false, features = ["cortex-m-systick"] }
 
-[profile.dev]
-panic = "abort"
+# Remove these if you don't want logging.
+imxrt-log = { version = "0.1", default-features = false, features = ["log", "usbd"] }
+log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
 
-[profile.release]
-panic = "abort"
+teensy4-panic = { version = "0.2", features = ["log"] }
 
+[dependencies.teensy4-bsp]
+version = "0.5"
+features = [
+    # Use the BSP's runtime.
+    "rt",
+]
+
+# Don't optimize build dependencies, like proc macros.
+# Helps with build times.
+[profile.release.build-override]
+opt-level = 0
