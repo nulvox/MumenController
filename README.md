@@ -1,11 +1,17 @@
 # MumenController
-This project implements a fight stick firmware to be:
- * fast
- * effective
- * compliant
- * flexible
+This project implements a fight stick firmware to be fast and compliant to evo rules. 
 
-# Setup
+# Setup (i.MX RT/Teensy 4.0)
+install [rustup ](https://rustup.rs/)
+
+`rustup update stable`
+
+`rustup target add thumbv7em-none-eabihf`
+
+`cargo install toml-fmt cargo-generate`
+
+
+# Old Setup (atmega32u4)
 
 ## windows
 install [VS 2022 build tools](https://visualstudio.microsoft.com/downloads/#other)

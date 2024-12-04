@@ -1,39 +1,8 @@
 [package]
-name = "mumen-controller"
+name = "MumenController"
 version = "0.1.0"
-authors = ["nulvox <38874956+nulvox@users.noreply.github.com>"]
 edition = "2021"
-license = "MIT OR Apache-2.0"
 
-[[bin]]
-name = "mumen-controller"
-test = false
-bench = false
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-panic-halt = "0.2.0"
-ufmt = "0.1.0"
-debouncr = "0.2.2"
-usbd-human-interface-device = "0.5"
-# usb-device = "0.2"
-# usbd-human-interface-device = { git = "https://github.com/nulvox/usbd-human-interface-device.git", branch = "master" }
-usb-device = "0.3"
-arduino-hal = { git = "https://github.com/rahix/avr-hal", features = [
-    "arduino-leonardo",
-] }
-
-[build-dependencies.proc-macro2]
-version = "=1.0.79"
-
-# Configure the build for minimal size - AVRs have very little program memory
-[profile.dev]
-panic = "abort"
-lto = false
-opt-level = "s"
-
-[profile.release]
-panic = "abort"
-codegen-units = 1
-debug = false
-lto = false
-opt-level = "s"
