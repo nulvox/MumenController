@@ -12,6 +12,7 @@
 #![no_main]
 
 use teensy4_panic as _;
+mod check_inputs.rs;
 
 #[rtic::app(device = teensy4_bsp, peripherals = true, dispatchers = [KPP])]
 mod app {
@@ -37,6 +38,12 @@ mod app {
         led: board::Led,
         /// A poller to control USB logging.
         poller: logging::Poller,
+        /// The USB peripheral.
+        usb: bsp::usb::UsbBus,
+        /// Digital Input Pins
+        pins: bsp::t40::Pins,
+        /// Analog Input Pins
+        analog_pins: bsp::t40::AnalogPins,
     }
 
     #[init]
