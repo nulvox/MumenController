@@ -12,7 +12,8 @@
 #![no_main]
 
 use teensy4_panic as _;
-mod check_inputs.rs;
+// mod input;
+// mod usb;
 
 #[rtic::app(device = teensy4_bsp, peripherals = true, dispatchers = [KPP])]
 mod app {
