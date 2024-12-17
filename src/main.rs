@@ -52,6 +52,7 @@ mod app {
             mut gpio2,
             pins,
             usb,
+            analog_pins,
             ..
         } = my_board(cx.device);
 
@@ -75,10 +76,10 @@ mod app {
         let pin_t_analog_left = gpio2.input(pins.p4);
         let pin_t_analog_right = gpio2.input(pins.p5);
         let pin_lockout = gpio2.input(pins.p0);
-        let pin_lx = gpio2.analog_input(pins.p20);
-        let pin_ly = gpio2.analog_input(pins.p21);
-        let pin_rx = gpio2.analog_input(pins.p22);
-        let pin_ry = gpio2.analog_input(pins.p23);
+        let pin_lx = gpio2.analog_input(analog_pins.p20);
+        let pin_ly = gpio2.analog_input(analog_pins.p21);
+        let pin_rx = gpio2.analog_input(analog_pins.p22);
+        let pin_ry = gpio2.analog_input(analog_pins.p23);
 
         let poller = logging::log::usbd(usb, logging::Interrupts::Enabled).unwrap();
 
