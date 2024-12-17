@@ -12,8 +12,8 @@
 #![no_main]
 
 use teensy4_panic as _;
-// mod input;
-// mod usb;
+mod input;
+mod usb;
 
 #[rtic::app(device = teensy4_bsp, peripherals = true, dispatchers = [KPP])]
 mod app {
@@ -56,7 +56,27 @@ mod app {
             ..
         } = my_board(cx.device);
 
-        let led = board::led(&mut gpio2, pins.p13);
+        // let led = board::led(&mut gpio2, pins.p13);
+        let pin_a = SWITCH_A;
+        let pin_b = SWITCH_B;
+        let pin_x = SWITCH_X;
+        let pin_y = SWITCH_Y;
+        let pin_l1 = SWITCH_L1;
+        let pin_r1 = SWITCH_R1;
+        let pin_l2 = SWITCH_L2;
+        let pin_r2 = SWITCH_R2;
+        let pin_select = SWITCH_SELECT;
+        let pin_start = SWITCH_START;
+        let pin_home = SWITCH_HOME;
+        let pin_shift = SWITCH_SHIFT;
+        let pin_up = SWITCH_UP;
+        let pin_down = SWITCH_DOWN;
+        let pin_left = SWITCH_LEFT;
+        let pin_right = SWITCH_RIGHT;
+        let pin_t_analog_left = SWITCH_T_ANALOG_LEFT;
+        let pin_t_analog_right = SWITCH_T_ANALOG_RIGHT;
+        let pin_lockout = SWITCH_LOCKOUT;
+
         let poller = logging::log::usbd(usb, logging::Interrupts::Enabled).unwrap();
 
         Systick::start(
