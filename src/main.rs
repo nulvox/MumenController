@@ -54,7 +54,6 @@ mod app {
             usb,
             ..
         } = my_board(cx.device);
-        // mod input;
 
         let pin_a = gpio2.input(pins.p14);
         let pin_b = gpio2.input(pins.p11);
