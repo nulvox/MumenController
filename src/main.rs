@@ -12,7 +12,6 @@
 #![no_main]
 
 use teensy4_panic as _;
-mod input;
 mod usb;
 
 #[rtic::app(device = teensy4_bsp, peripherals = true, dispatchers = [KPP])]
@@ -55,27 +54,32 @@ mod app {
             usb,
             ..
         } = my_board(cx.device);
+        // mod input;
 
-        // let led = board::led(&mut gpio2, pins.p13);
-        let pin_a = SWITCH_A;
-        let pin_b = SWITCH_B;
-        let pin_x = SWITCH_X;
-        let pin_y = SWITCH_Y;
-        let pin_l1 = SWITCH_L1;
-        let pin_r1 = SWITCH_R1;
-        let pin_l2 = SWITCH_L2;
-        let pin_r2 = SWITCH_R2;
-        let pin_select = SWITCH_SELECT;
-        let pin_start = SWITCH_START;
-        let pin_home = SWITCH_HOME;
-        let pin_shift = SWITCH_SHIFT;
-        let pin_up = SWITCH_UP;
-        let pin_down = SWITCH_DOWN;
-        let pin_left = SWITCH_LEFT;
-        let pin_right = SWITCH_RIGHT;
-        let pin_t_analog_left = SWITCH_T_ANALOG_LEFT;
-        let pin_t_analog_right = SWITCH_T_ANALOG_RIGHT;
-        let pin_lockout = SWITCH_LOCKOUT;
+        let pin_a = gpio2.input(pins.p14);
+        let pin_b = gpio2.input(pins.p11);
+        let pin_x = gpio2.input(pins.p9);
+        let pin_y = gpio2.input(pins.p16);
+        let pin_l1 = gpio2.input(pins.p15);
+        let pin_r1 = gpio2.input(pins.p10);
+        let pin_l2 = gpio2.input(pins.p12);
+        let pin_r2 = gpio2.input(pins.p13);
+        let pin_l3 = gpio2.input(pins.p3);
+        let pin_r3 = gpio2.input(pins.p2);
+        let pin_select = gpio2.input(pins.p18);
+        let pin_start = gpio2.input(pins.p17);
+        let pin_home = gpio2.input(pins.p8);
+        let pin_up = gpio2.input(pins.p1);
+        let pin_down = gpio2.input(pins.p6);
+        let pin_left = gpio2.input(pins.p7);
+        let pin_right = gpio2.input(pins.p19);
+        let pin_t_analog_left = gpio2.input(pins.p4);
+        let pin_t_analog_right = gpio2.input(pins.p5);
+        let pin_lockout = gpio2.input(pins.p0);
+        let pin_lx = gpio2.analog_input(pins.p20);
+        let pin_ly = gpio2.analog_input(pins.p21);
+        let pin_rx = gpio2.analog_input(pins.p22);
+        let pin_ry = gpio2.analog_input(pins.p23);
 
         let poller = logging::log::usbd(usb, logging::Interrupts::Enabled).unwrap();
 
