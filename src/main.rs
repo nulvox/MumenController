@@ -57,7 +57,7 @@ mod app {
 
         // let led = board::led(&mut gpio2, pins.p13);
         let _pin_a = gpio1.input(pins.p14);
-        let _pin_b = gpio1.input(pins.p23);
+        let _pin_b = gpio2.input(pins.p11);
         let _pin_x = gpio2.input(pins.p9);
         let _pin_y = gpio1.input(pins.p16);
         let _pin_l1 = gpio1.input(pins.p15);
@@ -76,12 +76,13 @@ mod app {
         let _pin_t_analog_left = gpio4.input(pins.p4);
         let _pin_t_analog_right = gpio4.input(pins.p5);
         let _pin_lock = gpio1.input(pins.p0);
-        // let mut _pin_rx = pins.p22;
-        // configure(Config::zero().input().into());
-        // let _pin_rx = AdcPin::new(pins.p22);
-        // let _pin_ry = AdcPin::new(pins.p23);
-        // let pin_lx = AdcPin::new(pins.p20);
-        // let _pin_ly = AdcPin::new(pins.p21);
+        let _pin_rx = gpio1.input(pins.p22);
+        let _pin_ry = gpio1.input(pins.p23);
+        let _pin_lx = gpio1.input(pins.p20);
+        let _pin_ly = gpio1.input(pins.p21);
+        // let _pin_ry = adc1.adc_pin(pins.p23);
+        // let _pin_lx = adc1.adc_pin(pins.p20);
+        // let _pin_ly = adc1.adc_pin(pins.p21);
 
         let poller = logging::log::usbd(usb, logging::Interrupts::Enabled).unwrap();
 
