@@ -46,11 +46,12 @@ mod app {
         let board::Resources {
             mut gpio1,
             mut gpio2,
-            // gpio3,
+            // mut gpio3,
             mut gpio4,
             pins,
             usb,
             // adc1,
+            // adc2,
             ..
         } = my_board(cx.device);
 
@@ -75,6 +76,13 @@ mod app {
         let _pin_t_analog_left = gpio4.input(pins.p4);
         let _pin_t_analog_right = gpio4.input(pins.p5);
         let _pin_lock = gpio1.input(pins.p0);
+        // let mut _pin_rx = pins.p22;
+        // configure(Config::zero().input().into());
+        // let _pin_rx = AdcPin::new(pins.p22);
+        // let _pin_ry = AdcPin::new(pins.p23);
+        // let pin_lx = AdcPin::new(pins.p20);
+        // let _pin_ly = AdcPin::new(pins.p21);
+
         let poller = logging::log::usbd(usb, logging::Interrupts::Enabled).unwrap();
 
         Systick::start(
