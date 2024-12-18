@@ -10,9 +10,10 @@
 
 #![no_std]
 #![no_main]
+#![feature(generic_arg_infer)]
 
 use teensy4_panic as _;
-mod usb;
+// mod usb;
 
 #[rtic::app(device = teensy4_bsp, peripherals = true, dispatchers = [KPP])]
 mod app {
@@ -35,52 +36,45 @@ mod app {
     #[local]
     struct Local {
         /// The LED on pin 13.
-        led: board::Led,
+        // led: board::Led,
         /// A poller to control USB logging.
         poller: logging::Poller,
-        /// The USB peripheral.
-        usb: bsp::usb::UsbBus,
-        /// Digital Input Pins
-        pins: bsp::t40::Pins,
-        /// Analog Input Pins
-        analog_pins: bsp::t40::AnalogPins,
     }
 
     #[init]
     fn init(cx: init::Context) -> (Shared, Local) {
         let board::Resources {
+            mut gpio1,
             mut gpio2,
+            // gpio3,
+            mut gpio4,
             pins,
             usb,
-            analog_pins,
+            // adc1,
             ..
         } = my_board(cx.device);
 
-        let pin_a = gpio2.input(pins.p14);
-        let pin_b = gpio2.input(pins.p11);
-        let pin_x = gpio2.input(pins.p9);
-        let pin_y = gpio2.input(pins.p16);
-        let pin_l1 = gpio2.input(pins.p15);
-        let pin_r1 = gpio2.input(pins.p10);
-        let pin_l2 = gpio2.input(pins.p12);
-        let pin_r2 = gpio2.input(pins.p13);
-        let pin_l3 = gpio2.input(pins.p3);
-        let pin_r3 = gpio2.input(pins.p2);
-        let pin_select = gpio2.input(pins.p18);
-        let pin_start = gpio2.input(pins.p17);
-        let pin_home = gpio2.input(pins.p8);
-        let pin_up = gpio2.input(pins.p1);
-        let pin_down = gpio2.input(pins.p6);
-        let pin_left = gpio2.input(pins.p7);
-        let pin_right = gpio2.input(pins.p19);
-        let pin_t_analog_left = gpio2.input(pins.p4);
-        let pin_t_analog_right = gpio2.input(pins.p5);
-        let pin_lockout = gpio2.input(pins.p0);
-        let pin_lx = gpio2.analog_input(analog_pins.p20);
-        let pin_ly = gpio2.analog_input(analog_pins.p21);
-        let pin_rx = gpio2.analog_input(analog_pins.p22);
-        let pin_ry = gpio2.analog_input(analog_pins.p23);
-
+        // let led = board::led(&mut gpio2, pins.p13);
+        let _pin_a = gpio1.input(pins.p14);
+        let _pin_b = gpio1.input(pins.p23);
+        let _pin_x = gpio2.input(pins.p9);
+        let _pin_y = gpio1.input(pins.p16);
+        let _pin_l1 = gpio1.input(pins.p15);
+        let _pin_r1 = gpio2.input(pins.p10);
+        let _pin_l2 = gpio2.input(pins.p12);
+        let _pin_r2 = gpio2.input(pins.p13);
+        let _pin_l3 = gpio4.input(pins.p3);
+        let _pin_r3 = gpio4.input(pins.p2);
+        let _pin_select = gpio1.input(pins.p18);
+        let _pin_start = gpio1.input(pins.p17);
+        let _pin_home = gpio2.input(pins.p8);
+        let _pin_up = gpio1.input(pins.p1);
+        let _pin_down = gpio2.input(pins.p6);
+        let _pin_left = gpio2.input(pins.p7);
+        let _pin_right = gpio1.input(pins.p19);
+        let _pin_t_analog_left = gpio4.input(pins.p4);
+        let _pin_t_analog_right = gpio4.input(pins.p5);
+        let _pin_lock = gpio1.input(pins.p0);
         let poller = logging::log::usbd(usb, logging::Interrupts::Enabled).unwrap();
 
         Systick::start(
@@ -90,14 +84,14 @@ mod app {
         );
 
         blink::spawn().unwrap();
-        (Shared {}, Local { led, poller })
+        (Shared {}, Local { poller })
     }
 
-    #[task(local = [led])]
-    async fn blink(cx: blink::Context) {
+    #[task()]
+    async fn blink(_cx: blink::Context) {
         let mut count = 0u32;
         loop {
-            cx.local.led.toggle();
+            // cx.local.led.toggle();
             Systick::delay(500.millis()).await;
 
             log::info!("Hello from your Teensy 4! The count is {count}");
