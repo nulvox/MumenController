@@ -22,6 +22,8 @@ mod app {
         hal::{gpio, iomuxc},
         pins,
     };
+
+    // use teensy4_bsp::ral::iomuxc;
     use teensy4_bsp::{self as bsp, hal::iomuxc::Pad};
 
     use imxrt_log as logging;
@@ -34,36 +36,38 @@ mod app {
 
     use crate::usb::{KeyData, PadReport};
     type Input = gpio::Input<pins::t40::P7>;
+    const PIN_CONFIG: iomuxc::Config =
+        iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
 
     /// There are no resources shared across tasks.
     #[shared]
     struct Shared {
         keys: PadReport,
         // keydata: KeyData,
-        pin_a: Input,
-        pin_b: Input,
-        pin_x: Input,
-        pin_y: Input,
-        pin_l1: Input,
-        pin_r1: Input,
-        pin_l2: Input,
-        pin_r2: Input,
-        pin_l3: Input,
-        pin_r3: Input,
-        pin_select: Input,
-        pin_start: Input,
-        pin_home: Input,
-        pin_up: Input,
-        pin_down: Input,
-        pin_left: Input,
-        pin_right: Input,
-        pin_t_analog_left: Input,
-        pin_t_analog_right: Input,
-        pin_lock: Input,
-        pin_rx: Input,
-        pin_ry: Input,
-        pin_lx: Input,
-        pin_ly: Input,
+        pin_a: gpio::Input<pins::t40::P14>,
+        pin_b: gpio::Input<pins::t40::P11>,
+        pin_x: gpio::Input<pins::t40::P9>,
+        pin_y: gpio::Input<pins::t40::P16>,
+        pin_l1: gpio::Input<pins::t40::P15>,
+        pin_r1: gpio::Input<pins::t40::P10>,
+        pin_l2: gpio::Input<pins::t40::P12>,
+        pin_r2: gpio::Input<pins::t40::P13>,
+        pin_l3: gpio::Input<pins::t40::P3>,
+        pin_r3: gpio::Input<pins::t40::P2>,
+        pin_select: gpio::Input<pins::t40::P18>,
+        pin_start: gpio::Input<pins::t40::P17>,
+        pin_home: gpio::Input<pins::t40::P8>,
+        pin_up: gpio::Input<pins::t40::P1>,
+        pin_down: gpio::Input<pins::t40::P6>,
+        pin_left: gpio::Input<pins::t40::P7>,
+        pin_right: gpio::Input<pins::t40::P19>,
+        pin_t_analog_left: gpio::Input<pins::t40::P4>,
+        pin_t_analog_right: gpio::Input<pins::t40::P5>,
+        pin_lock: gpio::Input<pins::t40::P0>,
+        pin_rx: gpio::Input<pins::t40::P22>,
+        pin_ry: gpio::Input<pins::t40::P23>,
+        pin_lx: gpio::Input<pins::t40::P20>,
+        pin_ly: gpio::Input<pins::t40::P21>,
     }
 
     /// These resources are local to individual tasks.
@@ -82,12 +86,37 @@ mod app {
             mut gpio2,
             // mut gpio3,
             mut gpio4,
-            pins,
+            mut pins,
             usb,
             // adc1,
             // adc2,
             ..
         } = my_board(cx.device);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
 
         // let led = board::led(&mut gpio2, pins.p13);
         let pin_a = gpio1.input(pins.p14);
@@ -168,9 +197,9 @@ mod app {
     #[task(shared = [ keys, pin_a, pin_b, pin_x, pin_y, pin_l1, pin_r1, pin_l2, pin_r2, pin_l3, pin_r3, pin_select, pin_start, pin_home, pin_up, pin_down, pin_left, pin_right, pin_t_analog_left, pin_t_analog_right, pin_lock, pin_rx, pin_ry, pin_lx, pin_ly  ])]
     async fn blink(cx: blink::Context) {
         loop {
-            if cx.local.pin_t_analog_left.is_set() {
+            if cx.shared.pin_t_analog_left.is_high().unwrap() {
                 cx.shared.keys.lx = 0;
-            } else if cx.local.pin_t_analog_right.is_set() {
+            } else if cx.shared.pin_t_analog_right.is_high().unwrap() {
                 cx.shared.keys.lx = 255;
             }
         }
