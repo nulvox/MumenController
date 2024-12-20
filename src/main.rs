@@ -13,12 +13,16 @@
 #![feature(generic_arg_infer)]
 
 use teensy4_panic as _;
-// mod usb;
+mod usb;
 
 #[rtic::app(device = teensy4_bsp, peripherals = true, dispatchers = [KPP])]
 mod app {
     use bsp::board;
-    use teensy4_bsp as bsp;
+    use bsp::{
+        hal::{gpio, iomuxc},
+        pins,
+    };
+    use teensy4_bsp::{self as bsp, hal::iomuxc::Pad};
 
     use imxrt_log as logging;
 
@@ -28,9 +32,39 @@ mod app {
 
     use rtic_monotonics::systick::{Systick, *};
 
+    use crate::usb::{KeyData, PadReport};
+    type Input = gpio::Input<pins::t40::P7>;
+
     /// There are no resources shared across tasks.
     #[shared]
-    struct Shared {}
+    struct Shared {
+        keys: PadReport,
+        // keydata: KeyData,
+        pin_a: Input,
+        pin_b: Input,
+        pin_x: Input,
+        pin_y: Input,
+        pin_l1: Input,
+        pin_r1: Input,
+        pin_l2: Input,
+        pin_r2: Input,
+        pin_l3: Input,
+        pin_r3: Input,
+        pin_select: Input,
+        pin_start: Input,
+        pin_home: Input,
+        pin_up: Input,
+        pin_down: Input,
+        pin_left: Input,
+        pin_right: Input,
+        pin_t_analog_left: Input,
+        pin_t_analog_right: Input,
+        pin_lock: Input,
+        pin_rx: Input,
+        pin_ry: Input,
+        pin_lx: Input,
+        pin_ly: Input,
+    }
 
     /// These resources are local to individual tasks.
     #[local]
@@ -56,36 +90,42 @@ mod app {
         } = my_board(cx.device);
 
         // let led = board::led(&mut gpio2, pins.p13);
-        let _pin_a = gpio1.input(pins.p14);
-        let _pin_b = gpio2.input(pins.p11);
-        let _pin_x = gpio2.input(pins.p9);
-        let _pin_y = gpio1.input(pins.p16);
-        let _pin_l1 = gpio1.input(pins.p15);
-        let _pin_r1 = gpio2.input(pins.p10);
-        let _pin_l2 = gpio2.input(pins.p12);
-        let _pin_r2 = gpio2.input(pins.p13);
-        let _pin_l3 = gpio4.input(pins.p3);
-        let _pin_r3 = gpio4.input(pins.p2);
-        let _pin_select = gpio1.input(pins.p18);
-        let _pin_start = gpio1.input(pins.p17);
-        let _pin_home = gpio2.input(pins.p8);
-        let _pin_up = gpio1.input(pins.p1);
-        let _pin_down = gpio2.input(pins.p6);
-        let _pin_left = gpio2.input(pins.p7);
-        let _pin_right = gpio1.input(pins.p19);
-        let _pin_t_analog_left = gpio4.input(pins.p4);
-        let _pin_t_analog_right = gpio4.input(pins.p5);
-        let _pin_lock = gpio1.input(pins.p0);
-        let _pin_rx = gpio1.input(pins.p22);
-        let _pin_ry = gpio1.input(pins.p23);
-        let _pin_lx = gpio1.input(pins.p20);
-        let _pin_ly = gpio1.input(pins.p21);
-        // let _pin_ry = adc1.adc_pin(pins.p23);
-        // let _pin_lx = adc1.adc_pin(pins.p20);
-        // let _pin_ly = adc1.adc_pin(pins.p21);
+        let pin_a = gpio1.input(pins.p14);
+        let pin_b = gpio2.input(pins.p11);
+        let pin_x = gpio2.input(pins.p9);
+        let pin_y = gpio1.input(pins.p16);
+        let pin_l1 = gpio1.input(pins.p15);
+        let pin_r1 = gpio2.input(pins.p10);
+        let pin_l2 = gpio2.input(pins.p12);
+        let pin_r2 = gpio2.input(pins.p13);
+        let pin_l3 = gpio4.input(pins.p3);
+        let pin_r3 = gpio4.input(pins.p2);
+        let pin_select = gpio1.input(pins.p18);
+        let pin_start = gpio1.input(pins.p17);
+        let pin_home = gpio2.input(pins.p8);
+        let pin_up = gpio1.input(pins.p1);
+        let pin_down = gpio2.input(pins.p6);
+        let pin_left = gpio2.input(pins.p7);
+        let pin_right = gpio1.input(pins.p19);
+        let pin_t_analog_left = gpio4.input(pins.p4);
+        let pin_t_analog_right = gpio4.input(pins.p5);
+        let pin_lock = gpio1.input(pins.p0);
+        let pin_rx = gpio1.input(pins.p22);
+        let pin_ry = gpio1.input(pins.p23);
+        let pin_lx = gpio1.input(pins.p20);
+        let pin_ly = gpio1.input(pins.p21);
 
         let poller = logging::log::usbd(usb, logging::Interrupts::Enabled).unwrap();
-
+        let keydata: KeyData = KeyData {
+            buttons: 0,
+            hat: 0,
+            padding: 0,
+            lx: 0,
+            ly: 0,
+            rx: 0,
+            ry: 0,
+        };
+        let keys = PadReport::new(&keydata);
         Systick::start(
             cx.core.SYST,
             board::ARM_FREQUENCY,
@@ -93,29 +133,50 @@ mod app {
         );
 
         blink::spawn().unwrap();
-        (Shared {}, Local { poller })
+        (
+            Shared {
+                keys,
+                pin_a,
+                pin_b,
+                pin_x,
+                pin_y,
+                pin_l1,
+                pin_r1,
+                pin_l2,
+                pin_r2,
+                pin_l3,
+                pin_r3,
+                pin_select,
+                pin_start,
+                pin_home,
+                pin_up,
+                pin_down,
+                pin_left,
+                pin_right,
+                pin_t_analog_left,
+                pin_t_analog_right,
+                pin_lock,
+                pin_rx,
+                pin_ry,
+                pin_lx,
+                pin_ly,
+            },
+            Local { poller },
+        )
     }
 
-    #[task()]
-    async fn blink(_cx: blink::Context) {
-        let mut count = 0u32;
+    #[task(shared = [ keys, pin_a, pin_b, pin_x, pin_y, pin_l1, pin_r1, pin_l2, pin_r2, pin_l3, pin_r3, pin_select, pin_start, pin_home, pin_up, pin_down, pin_left, pin_right, pin_t_analog_left, pin_t_analog_right, pin_lock, pin_rx, pin_ry, pin_lx, pin_ly  ])]
+    async fn blink(cx: blink::Context) {
         loop {
-            // cx.local.led.toggle();
-            Systick::delay(500.millis()).await;
-
-            log::info!("Hello from your Teensy 4! The count is {count}");
-            if count % 7 == 0 {
-                log::warn!("Here's a warning at count {count}");
+            if cx.local.pin_t_analog_left.is_set() {
+                cx.shared.keys.lx = 0;
+            } else if cx.local.pin_t_analog_right.is_set() {
+                cx.shared.keys.lx = 255;
             }
-            if count % 23 == 0 {
-                log::error!("Here's an error at count {count}");
-            }
-
-            count = count.wrapping_add(1);
         }
     }
 
-    #[task(binds = USB_OTG1, local = [poller])]
+    #[task(binds = USB_OTG1, local = [ poller ])]
     fn log_over_usb(cx: log_over_usb::Context) {
         cx.local.poller.poll();
     }
