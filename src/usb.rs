@@ -17,10 +17,10 @@ pub const KEY_MASK_SELECT: u16 = 0x0020;
 pub const KEY_MASK_START: u16 = 0x0010;
 pub const KEY_MASK_HOME: u16 = 0x0008;
 
-pub const HAT_MASK_UP: u16 = 0x0001;
-pub const HAT_MASK_DOWN: u16 = 0x0002;
-pub const HAT_MASK_LEFT: u16 = 0x0004;
-pub const HAT_MASK_RIGHT: u16 = 0x0008;
+pub const HAT_MASK_UP: u8 = 0x01;
+pub const HAT_MASK_DOWN: u8 = 0x02;
+pub const HAT_MASK_LEFT: u8 = 0x04;
+pub const HAT_MASK_RIGHT: u8 = 0x08;
 
 #[derive(Debug, Copy, Clone)]
 pub struct KeyData {

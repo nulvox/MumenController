@@ -11,6 +11,7 @@ rtic-monotonics = { version = "1", default-features = false, features = [
 # usbd-hid-device = { version = "0.1.1" }
 imxrt-usbd = { version = "0.1" }
 usbd-hid-device = { version = "0.1" }
+embedded-hal = "1.0.0"
 
 # Remove these if you don't want logging.
 imxrt-log = { version = "0.1", default-features = false, features = [

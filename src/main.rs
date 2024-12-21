@@ -19,7 +19,7 @@ mod usb;
 mod app {
     use bsp::board;
     use bsp::{
-        hal::{gpio, iomuxc},
+        hal::{adc, gpio, iomuxc},
         pins,
     };
 
@@ -34,8 +34,8 @@ mod app {
 
     use rtic_monotonics::systick::{Systick, *};
 
-    use crate::usb::{KeyData, PadReport, KEY_MASK_A};
-    type Input = gpio::Input<pins::t40::P7>;
+    use crate::usb::*;
+    use embedded_hal::digital::InputPin;
     const PIN_CONFIG: iomuxc::Config =
         iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
 
@@ -154,14 +154,14 @@ mod app {
             rx: 0,
             ry: 0,
         };
-        let mut keys: PadReport = PadReport::new(&keydata);
+        let keys: PadReport = PadReport::new(&keydata);
         Systick::start(
             cx.core.SYST,
             board::ARM_FREQUENCY,
             rtic_monotonics::create_systick_token!(),
         );
 
-        blink::spawn().unwrap();
+        check_input::spawn().unwrap();
         (
             Shared { keys },
             Local {
@@ -196,7 +196,7 @@ mod app {
     }
 
     #[task(shared = [ keys ], local = [ keydata, pin_a, pin_b, pin_x, pin_y, pin_l1, pin_r1, pin_l2, pin_r2, pin_l3, pin_r3, pin_select, pin_start, pin_home, pin_up, pin_down, pin_left, pin_right, pin_t_analog_left, pin_t_analog_right, pin_lock, pin_rx, pin_ry, pin_lx, pin_ly ])]
-    async fn blink(cx: blink::Context) {
+    async fn check_input(mut cx: check_input::Context) {
         loop {
             //     if cx.local.pin_t_analog_left.is_low().unwrap() {
             //         // Do some stuff with the analog stick
