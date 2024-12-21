@@ -39,7 +39,6 @@ mod app {
     const PIN_CONFIG: iomuxc::Config =
         iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
 
-    /// There are no resources shared across tasks.
     #[shared]
     struct Shared {
         keys: PadReport,
@@ -92,31 +91,30 @@ mod app {
             // adc2,
             ..
         } = my_board(cx.device);
+        iomuxc::configure(&mut pins.p0, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p1, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p2, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p3, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p4, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p5, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p6, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p7, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p8, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p9, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p10, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p11, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p12, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p13, PIN_CONFIG);
         iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p15, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p16, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p17, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p18, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p19, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p20, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p21, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p22, PIN_CONFIG);
+        iomuxc::configure(&mut pins.p23, PIN_CONFIG);
 
         // let led = board::led(&mut gpio2, pins.p13);
         let pin_a = gpio1.input(pins.p14);
@@ -144,7 +142,9 @@ mod app {
         let pin_lx = gpio1.input(pins.p20);
         let pin_ly = gpio1.input(pins.p21);
 
+        // The poller is an artifact from the boilerplate code.
         let poller = logging::log::usbd(usb, logging::Interrupts::Enabled).unwrap();
+
         let keydata: KeyData = KeyData {
             buttons: 0,
             hat: 0,
@@ -206,9 +206,10 @@ mod app {
             //         // Do some stuff with the analog stick
             //         pass
             //     }
+            // cx.shared.keys.clear_keys(&self);
             cx.shared.keys.clear_keys();
             if cx.shared.pin_a.is_low().unwrap() {
-                keydata.buttons |= KEY_MASK_A;
+                cx.shared.keys.buttons |= KEY_MASK_A;
             }
             if cx.shared.pin_b.is_low().unwrap() {
                 keydata.buttons |= KEY_MASK_B;
