@@ -34,7 +34,7 @@ mod app {
 
     use rtic_monotonics::systick::{Systick, *};
 
-    use crate::usb::{KeyData, PadReport};
+    use crate::usb::{KeyData, PadReport, KEY_MASK_A};
     type Input = gpio::Input<pins::t40::P7>;
     const PIN_CONFIG: iomuxc::Config =
         iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
@@ -43,7 +43,7 @@ mod app {
     #[shared]
     struct Shared {
         keys: PadReport,
-        // keydata: KeyData,
+        keydata: KeyData,
         pin_a: gpio::Input<pins::t40::P14>,
         pin_b: gpio::Input<pins::t40::P11>,
         pin_x: gpio::Input<pins::t40::P9>,
@@ -154,7 +154,7 @@ mod app {
             rx: 0,
             ry: 0,
         };
-        let keys = PadReport::new(&keydata);
+        let keys: PadReport = PadReport::new(&keydata);
         Systick::start(
             cx.core.SYST,
             board::ARM_FREQUENCY,
@@ -165,6 +165,7 @@ mod app {
         (
             Shared {
                 keys,
+                keydata,
                 pin_a,
                 pin_b,
                 pin_x,
@@ -194,13 +195,79 @@ mod app {
         )
     }
 
-    #[task(shared = [ keys, pin_a, pin_b, pin_x, pin_y, pin_l1, pin_r1, pin_l2, pin_r2, pin_l3, pin_r3, pin_select, pin_start, pin_home, pin_up, pin_down, pin_left, pin_right, pin_t_analog_left, pin_t_analog_right, pin_lock, pin_rx, pin_ry, pin_lx, pin_ly  ])]
+    #[task(shared = [ keys, keydata, pin_a, pin_b, pin_x, pin_y, pin_l1, pin_r1, pin_l2, pin_r2, pin_l3, pin_r3, pin_select, pin_start, pin_home, pin_up, pin_down, pin_left, pin_right, pin_t_analog_left, pin_t_analog_right, pin_lock, pin_rx, pin_ry, pin_lx, pin_ly  ])]
     async fn blink(cx: blink::Context) {
         loop {
-            if cx.shared.pin_t_analog_left.is_high().unwrap() {
-                cx.shared.keys.lx = 0;
-            } else if cx.shared.pin_t_analog_right.is_high().unwrap() {
-                cx.shared.keys.lx = 255;
+            //     if cx.shared.pin_t_analog_left.is_low().unwrap() {
+            //         // Do some stuff with the analog stick
+            //         pass
+            //     } else if cx.shared.pin_t_analog_right.is_high().unwrap() {
+            //         // cx.shared.keydata.lx = 255;
+            //         // Do some stuff with the analog stick
+            //         pass
+            //     }
+            cx.shared.keys.clear_keys();
+            if cx.shared.pin_a.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_A;
+            }
+            if cx.shared.pin_b.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_B;
+            }
+            if cx.shared.pin_x.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_X;
+            }
+            if cx.shared.pin_y.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_Y;
+            }
+            if cx.shared.pin_l1.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_L1;
+            }
+            if cx.shared.pin_r1.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_R1;
+            }
+            if cx.shared.pin_l2.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_L2;
+            }
+            if cx.shared.pin_r2.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_R2;
+            }
+            if cx.shared.pin_l3.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_L3;
+            }
+            if cx.shared.pin_r3.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_R3;
+            }
+            if cx.shared.pin_select.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_SELECT;
+            }
+            if cx.shared.pin_start.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_START;
+            }
+            if cx.shared.pin_home.is_low().unwrap() {
+                keydata.buttons |= KEY_MASK_HOME;
+            }
+            if cx.shared.pin_up.is_low().unwrap() {
+                // masks are your friend here
+                keydata.hat |= HAT_MASK_UP;
+            }
+            if cx.shared.pin_down.is_low().unwrap() {
+                keydata.hat |= HAT_MASK_DOWN;
+            }
+            if cx.shared.pin_left.is_low().unwrap() {
+                keydata.hat |= HAT_MASK_LEFT;
+            }
+            if cx.shared.pin_right.is_low().unwrap() {
+                keydata.hat |= HAT_MASK_RIGHT;
+            }
+            if cx.shared.pin_t_analog_left.is_low().unwrap() {
+                // We should measure the analog stick and set the value
+                keydata.lx = 255;
+                keydata.ly = 255;
+            }
+            if cx.shared.pin_t_analog_right.is_low().unwrap() {
+                // We should measure the analog stick and set the value
+                keydata.rx = 255;
+                keydata.ry = 255;
             }
         }
     }

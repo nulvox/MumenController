@@ -2,6 +2,26 @@
 
 use usbd_hid_device::HidReport;
 
+// aLL THE MASKS ARE WRONG
+pub const KEY_MASK_A: u16 = 0x8000;
+pub const KEY_MASK_B: u16 = 0x4000;
+pub const KEY_MASK_X: u16 = 0x2000;
+pub const KEY_MASK_Y: u16 = 0x1000;
+pub const KEY_MASK_L1: u16 = 0x0800;
+pub const KEY_MASK_R1: u16 = 0x0400;
+pub const KEY_MASK_L2: u16 = 0x0200;
+pub const KEY_MASK_R2: u16 = 0x0100;
+pub const KEY_MASK_L3: u16 = 0x0080;
+pub const KEY_MASK_R3: u16 = 0x0040;
+pub const KEY_MASK_SELECT: u16 = 0x0020;
+pub const KEY_MASK_START: u16 = 0x0010;
+pub const KEY_MASK_HOME: u16 = 0x0008;
+
+pub const HAT_MASK_UP: u16 = 0x0001;
+pub const HAT_MASK_DOWN: u16 = 0x0002;
+pub const HAT_MASK_LEFT: u16 = 0x0004;
+pub const HAT_MASK_RIGHT: u16 = 0x0008;
+
 #[derive(Debug, Copy, Clone)]
 pub struct KeyData {
     pub buttons: u16,
@@ -41,6 +61,11 @@ impl PadReport {
                 btnstate.ry,
             ],
         }
+    }
+
+    pub fn clear_keys(&mut self) {
+        self.bytes[0] = 0;
+        self.bytes[1] = 0;
     }
 
     pub fn send(&self) {
