@@ -19,12 +19,14 @@ mod usb;
 mod app {
     use bsp::board;
     use bsp::{
-        hal::{adc, gpio, iomuxc},
+        hal::{gpio, iomuxc},
+        // hal::{adc, gpio, iomuxc},
         pins,
     };
 
     // use teensy4_bsp::ral::iomuxc;
-    use teensy4_bsp::{self as bsp, hal::iomuxc::Pad};
+    // use teensy4_bsp::{self as bsp, hal::iomuxc::Pad};
+    use teensy4_bsp::{self as bsp};
 
     use imxrt_log as logging;
 
@@ -32,12 +34,24 @@ mod app {
     // change 't40' to 't41' or micromod, respectively.
     use board::t40 as my_board;
 
-    use rtic_monotonics::systick::{Systick, *};
+    // use rtic_monotonics::systick::{Systick, *};
+    use rtic_monotonics::systick::Systick;
 
     use crate::usb::*;
+    // use adc::AnalogInput;
     use embedded_hal::digital::InputPin;
+    // use teensy4_bsp::hal::iomuxc::adc::Pin as AdcPin;
+
     const PIN_CONFIG: iomuxc::Config =
         iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
+
+    // const ANALOG_PIN_CONFIG: iomuxc::Config = iomuxc::Config::zero()
+    //     .set_hysteresis(iomuxc::Hysteresis::Disabled)
+    //     .set_pull_keeper(None)
+    //     .set_open_drain(iomuxc::OpenDrain::Disabled)
+    //     .set_speed(iomuxc::Speed::Max)
+    //     .set_drive_strength(iomuxc::DriveStrength::R0_6)
+    //     .set_slew_rate(iomuxc::SlewRate::Slow);
 
     #[shared]
     struct Shared {
@@ -72,10 +86,10 @@ mod app {
         pin_t_analog_left: gpio::Input<pins::t40::P4>,
         pin_t_analog_right: gpio::Input<pins::t40::P5>,
         pin_lock: gpio::Input<pins::t40::P0>,
-        pin_rx: gpio::Input<pins::t40::P22>,
-        pin_ry: gpio::Input<pins::t40::P23>,
-        pin_lx: gpio::Input<pins::t40::P20>,
-        pin_ly: gpio::Input<pins::t40::P21>,
+        // pin_rx: adc::AnalogInput<pins::t40::P22, 9>,
+        // pin_ry: adc::AnalogInput<pins::t40::P23, 10>,
+        // pin_lx: adc::AnalogInput<pins::t40::P20, 7>,
+        // pin_ly: adc::AnalogInput<pins::t40::P21, 8>,
     }
 
     #[init]
@@ -111,12 +125,11 @@ mod app {
         iomuxc::configure(&mut pins.p17, PIN_CONFIG);
         iomuxc::configure(&mut pins.p18, PIN_CONFIG);
         iomuxc::configure(&mut pins.p19, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p20, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p21, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p22, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p23, PIN_CONFIG);
+        // iomuxc::configure(&mut pins.p20, ANALOG_PIN_CONFIG);
+        // iomuxc::configure(&mut pins.p21, ANALOG_PIN_CONFIG);
+        // iomuxc::configure(&mut pins.p22, ANALOG_PIN_CONFIG);
+        // iomuxc::configure(&mut pins.p23, ANALOG_PIN_CONFIG);
 
-        // let led = board::led(&mut gpio2, pins.p13);
         let pin_a = gpio1.input(pins.p14);
         let pin_b = gpio2.input(pins.p11);
         let pin_x = gpio2.input(pins.p9);
@@ -137,10 +150,14 @@ mod app {
         let pin_t_analog_left = gpio4.input(pins.p4);
         let pin_t_analog_right = gpio4.input(pins.p5);
         let pin_lock = gpio1.input(pins.p0);
-        let pin_rx = gpio1.input(pins.p22);
-        let pin_ry = gpio1.input(pins.p23);
-        let pin_lx = gpio1.input(pins.p20);
-        let pin_ly = gpio1.input(pins.p21);
+        // let pin_rx: adc::AnalogInput<pins::t40::P22, 9> = adc::AnalogInput::new(pins.p22);
+        // let pin_ry: adc::AnalogInput<pins::t40::P23, 10> = adc::AnalogInput::new(pins.p23);
+        // let pin_lx: adc::AnalogInput<pins::t40::P20, 7> = adc::AnalogInput::new(pins.p20);
+        // let pin_ly: adc::AnalogInput<pins::t40::P21, 8> = adc::AnalogInput::new(pins.p21);
+        // let pin_rx = adc::AnalogInput::<pins::t40::P22, 22>::new(pins.p22); // Pin 22, ADC channel 22
+        // let pin_ry = adc::AnalogInput::<pins::t40::P23, 23>::new(pins.p23); // Pin 23, ADC channel 23
+        // let pin_lx = adc::AnalogInput::<pins::t40::P20, 20>::new(pins.p20); // Pin 20, ADC channell 20
+        // let pin_ly = adc::AnalogInput::<pins::t40::P21, 21>::new(pins.p21); // Pin 21, ADC channel 21
 
         // The poller is an artifact from the boilerplate code.
         let poller = logging::log::usbd(usb, logging::Interrupts::Enabled).unwrap();
@@ -187,15 +204,41 @@ mod app {
                 pin_t_analog_left,
                 pin_t_analog_right,
                 pin_lock,
-                pin_rx,
-                pin_ry,
-                pin_lx,
-                pin_ly,
+                // pin_rx,
+                // pin_ry,
+                // pin_lx,
+                // pin_ly,
             },
         )
     }
 
-    #[task(shared = [ keys ], local = [ keydata, pin_a, pin_b, pin_x, pin_y, pin_l1, pin_r1, pin_l2, pin_r2, pin_l3, pin_r3, pin_select, pin_start, pin_home, pin_up, pin_down, pin_left, pin_right, pin_t_analog_left, pin_t_analog_right, pin_lock, pin_rx, pin_ry, pin_lx, pin_ly ])]
+    #[task(shared = [ keys ], local = [ 
+        keydata, 
+        pin_a, 
+        pin_b, 
+        pin_x, 
+        pin_y, 
+        pin_l1, 
+        pin_r1, 
+        pin_l2, 
+        pin_r2, 
+        pin_l3, 
+        pin_r3, 
+        pin_select, 
+        pin_start, 
+        pin_home, 
+        pin_up, 
+        pin_down, 
+        pin_left, 
+        pin_right, 
+        pin_t_analog_left, 
+        pin_t_analog_right, 
+        pin_lock, 
+        // pin_rx, 
+        // pin_ry, 
+        // pin_lx, 
+        // pin_ly 
+        ])]
     async fn check_input(mut cx: check_input::Context) {
         loop {
             //     if cx.local.pin_t_analog_left.is_low().unwrap() {
