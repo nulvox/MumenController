@@ -28,15 +28,13 @@ mod app {
     // use teensy4_bsp::{self as bsp, hal::iomuxc::Pad};
     use teensy4_bsp::{self as bsp};
 
-    use imxrt_log as logging;
-
     // If you're using a Teensy 4.1 or MicroMod, you should eventually
     // change 't40' to 't41' or micromod, respectively.
     use board::t40 as my_board;
 
     // use rtic_monotonics::systick::{Systick, *};
     use rtic_monotonics::systick::Systick;
-
+    use usb_device::prelude::*;
     use crate::usb::*;
     // use adc::AnalogInput;
     use embedded_hal::digital::InputPin;
@@ -61,7 +59,7 @@ mod app {
     /// These resources are local to individual tasks.
     #[local]
     struct Local {
-        hid: HIDClass<'static, UsbBus<UsbBusType>>,
+        hid: usbd_hid_device::Hid<'static, UsbBus<UsbBusType>>,
         keydata: KeyData,
         pin_a: gpio::Input<pins::t40::P14>,
         pin_b: gpio::Input<pins::t40::P11>,
@@ -152,15 +150,15 @@ mod app {
         // let pin_lx: adc::AnalogInput<pins::t40::P20, 7> = adc::AnalogInput::new(pins.p20);
         // let pin_ly: adc::AnalogInput<pins::t40::P21, 8> = adc::AnalogInput::new(pins.p21);
 
-        let usb_bus = UsbBus::new(usb_peripheral);
-        let hid = HIDClass::new(&usb_bus, PadReport::desc(), 60);
+        let usb_bus = usb_device::bus::UsbBusAllocator::new(usb);
+        let hid = usbd_hid_device::Hid::new(&usb_bus, 3);
 
-        let usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1234, 0x5678))
-            .manufacturer("Manufacturer")
-            .product("Product")
-            .serial_number("SerialNumber")
-            .device_class(0)
-            .build();
+        // let usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1234, 0x5678))
+        //     .manufacturer("Manufacturer")
+        //     .product("Product")
+        //     .serial_number("SerialNumber")
+        //     .device_class(0)
+        //     .build();
 
         let keydata: KeyData = KeyData {
             buttons: 0,
@@ -210,6 +208,9 @@ mod app {
                 // pin_ly,
             },
         )
+        // where should we do this?
+        // send_report::spawn().unwrap();
+        // ( Shared { keys } );
     }
 
     #[task(shared = [ keys ], local = [ 
@@ -239,9 +240,8 @@ mod app {
         // pin_lx, 
         // pin_ly 
         ])]
+        
     async fn check_input(mut cx: check_input::Context) {
-        send_report::spawn().unwrap();
-        ( Shared { keys } );
         loop {
             //     if cx.local.pin_t_analog_left.is_low().unwrap() {
             //         // Do some stuff with the analog stick
@@ -257,7 +257,6 @@ mod app {
                 keys.clear_keys();
                 // lets keep the closure open until we set all the keys.
                 // this prevents the system from generating a race condition with `keys`
-                // });
                 if cx.local.pin_a.is_low().unwrap() {
                     cx.local.keydata.buttons |= KEY_MASK_A;
                 }
@@ -329,9 +328,10 @@ mod app {
 
     #[task(binds = USB_OTG1, shared = [ keys ], local = [ hid ])]
     fn send_report(cx: send_report::Context) {
-        // cx.local.poller.poll();
         cx.shared.keys.lock(|keys: &mut PadReport| {
-            cx.local.hid.push_input(keys).ok();
+            // Everything else happens implicitly. 
+            //   check out configuration details in usb.rs
+            cx.local.hid.send_report(&keys)
         });
     }
 }
