@@ -61,10 +61,7 @@ mod app {
     /// These resources are local to individual tasks.
     #[local]
     struct Local {
-        /// The LED on pin 13.
-        // led: board::Led,
-        /// A poller to control USB logging.
-        poller: logging::Poller,
+        hid: HIDClass<'static, UsbBus<UsbBusType>>,
         keydata: KeyData,
         pin_a: gpio::Input<pins::t40::P14>,
         pin_b: gpio::Input<pins::t40::P11>,
@@ -154,13 +151,16 @@ mod app {
         // let pin_ry: adc::AnalogInput<pins::t40::P23, 10> = adc::AnalogInput::new(pins.p23);
         // let pin_lx: adc::AnalogInput<pins::t40::P20, 7> = adc::AnalogInput::new(pins.p20);
         // let pin_ly: adc::AnalogInput<pins::t40::P21, 8> = adc::AnalogInput::new(pins.p21);
-        // let pin_rx = adc::AnalogInput::<pins::t40::P22, 22>::new(pins.p22); // Pin 22, ADC channel 22
-        // let pin_ry = adc::AnalogInput::<pins::t40::P23, 23>::new(pins.p23); // Pin 23, ADC channel 23
-        // let pin_lx = adc::AnalogInput::<pins::t40::P20, 20>::new(pins.p20); // Pin 20, ADC channell 20
-        // let pin_ly = adc::AnalogInput::<pins::t40::P21, 21>::new(pins.p21); // Pin 21, ADC channel 21
 
-        // The poller is an artifact from the boilerplate code.
-        let poller = logging::log::usbd(usb, logging::Interrupts::Enabled).unwrap();
+        let usb_bus = UsbBus::new(usb_peripheral);
+        let hid = HIDClass::new(&usb_bus, PadReport::desc(), 60);
+
+        let usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1234, 0x5678))
+            .manufacturer("Manufacturer")
+            .product("Product")
+            .serial_number("SerialNumber")
+            .device_class(0)
+            .build();
 
         let keydata: KeyData = KeyData {
             buttons: 0,
@@ -182,7 +182,7 @@ mod app {
         (
             Shared { keys },
             Local {
-                poller,
+                hid,
                 keydata,
                 pin_a,
                 pin_b,
@@ -240,6 +240,8 @@ mod app {
         // pin_ly 
         ])]
     async fn check_input(mut cx: check_input::Context) {
+        send_report::spawn().unwrap();
+        ( Shared { keys } );
         loop {
             //     if cx.local.pin_t_analog_left.is_low().unwrap() {
             //         // Do some stuff with the analog stick
@@ -325,8 +327,11 @@ mod app {
         }
     }
 
-    #[task(binds = USB_OTG1, local = [ poller ])]
-    fn log_over_usb(cx: log_over_usb::Context) {
-        cx.local.poller.poll();
+    #[task(binds = USB_OTG1, shared = [ keys ], local = [ hid ])]
+    fn send_report(cx: send_report::Context) {
+        // cx.local.poller.poll();
+        cx.shared.keys.lock(|keys: &mut PadReport| {
+            cx.local.hid.push_input(keys).ok();
+        });
     }
 }

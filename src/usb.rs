@@ -1,6 +1,9 @@
 // Provide functionality to interact with USB devices.
 
+use usb_device::prelude::*;
+use usbd_hid_device::hid_class::HIDClass;
 use usbd_hid_device::HidReport;
+// use usbd_hid_device::UsbBus;
 
 // aLL THE MASKS ARE WRONG
 pub const KEY_MASK_A: u16 = 0x8000;
