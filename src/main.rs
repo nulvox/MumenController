@@ -150,7 +150,8 @@ mod app {
         // let pin_lx: adc::AnalogInput<pins::t40::P20, 7> = adc::AnalogInput::new(pins.p20);
         // let pin_ly: adc::AnalogInput<pins::t40::P21, 8> = adc::AnalogInput::new(pins.p21);
 
-        let usb_bus = usb_device::bus::UsbBusAllocator::new(usb);
+        let adapter = BusAdapter.new(usb, EP_MEMORY, EP_STATE);
+        let usb_bus = usb_device::bus::UsbBusAllocator::new(adapter);
         let hid = usbd_hid_device::Hid::new(&usb_bus, 3);
 
         // let usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1234, 0x5678))
@@ -329,8 +330,7 @@ mod app {
     #[task(binds = USB_OTG1, shared = [ keys ], local = [ hid ])]
     fn send_report(cx: send_report::Context) {
         cx.shared.keys.lock(|keys: &mut PadReport| {
-            // Everything else happens implicitly. 
-            //   check out configuration details in usb.rs
+            // Everything else happens implicitly. The bus is configured in init
             cx.local.hid.send_report(&keys)
         });
     }
