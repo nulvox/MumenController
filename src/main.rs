@@ -240,7 +240,9 @@ mod app {
         // pin_ly 
         ])] 
     async fn check_input(mut cx: check_input::Context) {
+        let mut dpad: u8 = 0;
         loop {
+            dpad = 0;
             //     if cx.local.pin_t_analog_left.is_low().unwrap() {
             //         // Do some stuff with the analog stick
             //         pass
@@ -351,23 +353,24 @@ mod app {
                     // Check up and down, clean SOCD
                     if cx.local.pin_down.is_low().unwrap() {
                         if cx.local.pin_up.is_low().unwrap() {
-                            cx.local.keydata.hat |= HAT_MASK_UP;
+                            dpad |= HAT_MASK_UP;
                         }
                         else {
-                            cx.local.keydata.hat |= HAT_MASK_DOWN;
+                            dpad |= HAT_MASK_DOWN;
                         }
                     }
                     else if cx.local.pin_down.is_low().unwrap() {
-                        cx.local.keydata.hat |= HAT_MASK_DOWN;
+                        dpad |= HAT_MASK_DOWN;
                             
                     }
                     // NOW LEFT AND RIGHT, still cleaning
                     if cx.local.pin_left.is_low().unwrap() {
-                        cx.local.keydata.hat |= HAT_MASK_LEFT;
+                        dpad |= HAT_MASK_LEFT;
                     }
                     else if cx.local.pin_right.is_low().unwrap() {
-                        cx.local.keydata.hat |= HAT_MASK_RIGHT;
+                        dpad |= HAT_MASK_RIGHT;
                     }
+                    keys.set_hat(dpad);
                 }
             });
         }
