@@ -20,10 +20,26 @@ pub const KEY_MASK_SELECT: u16 = 0x0020;
 pub const KEY_MASK_START: u16 = 0x0010;
 pub const KEY_MASK_HOME: u16 = 0x0008;
 
+// Nintendo uses a hat switch to mark
+// dpad inputs which force SOCD cleaning in firmware
+// this makes processing take forever, so we are mapping
+// the hat switch values to our array offsets and
+// recording the data as masks to speed up processing
 pub const HAT_MASK_UP: u8 = 0x01;
 pub const HAT_MASK_DOWN: u8 = 0x02;
 pub const HAT_MASK_LEFT: u8 = 0x04;
 pub const HAT_MASK_RIGHT: u8 = 0x08;
+pub const HAT_VALUES: [u8; 9] = [
+    1,  // up
+    9,  // up-right
+    8,  // right
+    10, // down-right
+    2,  // down
+    6,  // down-left
+    4,  // left
+    5,  // up-left
+    0,  // neutral
+];
 
 #[derive(Debug, Copy, Clone)]
 pub struct KeyData {
@@ -76,6 +92,10 @@ impl PadReport {
         // right stick set to neutral
         self.bytes[6] = 128;
         self.bytes[7] = 128;
+    }
+
+    pub fn set_hat(&mut self, dpad: u8) {
+        self.bytes[2] = HAT_VALUES.iter().position(|&r| r == dpad).unwrap() as u8;
     }
 
     pub fn send(&self) {
