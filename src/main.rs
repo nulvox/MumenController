@@ -19,7 +19,7 @@ mod usb;
 mod app {
     use bsp::board;
     use bsp::{
-        hal::{gpio, iomuxc},
+        hal::{gpio, iomuxc, usbd},
         // hal::{adc, gpio, iomuxc},
         pins,
     };
@@ -36,6 +36,7 @@ mod app {
     use rtic_monotonics::systick::Systick;
     use usb_device::prelude::*;
     use crate::usb::*;
+
     // use adc::AnalogInput;
     use embedded_hal::digital::InputPin;
     // use teensy4_bsp::hal::iomuxc::adc::Pin as AdcPin;
@@ -150,8 +151,8 @@ mod app {
         // let pin_lx: adc::AnalogInput<pins::t40::P20, 7> = adc::AnalogInput::new(pins.p20);
         // let pin_ly: adc::AnalogInput<pins::t40::P21, 8> = adc::AnalogInput::new(pins.p21);
 
-        let adapter = BusAdapter.new(usb, EP_MEMORY, EP_STATE);
-        let usb_bus = usb_device::bus::UsbBusAllocator::new(adapter);
+        // let adapter = usb_device::bus::UsbBus BusAdapter.new(usb, EP_MEMORY, EP_STATE);
+        let adapter = bsp::hal::usbd::BusAdapter::new(usb, buffer, state);
         let hid = usbd_hid_device::Hid::new(&usb_bus, 3);
 
         // let usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1234, 0x5678))
@@ -209,9 +210,6 @@ mod app {
                 // pin_ly,
             },
         )
-        // where should we do this?
-        // send_report::spawn().unwrap();
-        // ( Shared { keys } );
     }
 
     #[task(shared = [ keys ], local = [ 
@@ -240,8 +238,7 @@ mod app {
         // pin_ry, 
         // pin_lx, 
         // pin_ly 
-        ])]
-        
+        ])] 
     async fn check_input(mut cx: check_input::Context) {
         loop {
             //     if cx.local.pin_t_analog_left.is_low().unwrap() {
@@ -297,41 +294,90 @@ mod app {
                 if cx.local.pin_home.is_low().unwrap() {
                     cx.local.keydata.buttons |= KEY_MASK_HOME;
                 }
-
-                // rewrite the logic for the hat switch
-                if cx.local.pin_up.is_low().unwrap() {
-                    // masks are your friend here
-                    cx.local.keydata.hat |= HAT_MASK_UP;
-                }
-                if cx.local.pin_down.is_low().unwrap() {
-                    cx.local.keydata.hat |= HAT_MASK_DOWN;
-                }
-                if cx.local.pin_left.is_low().unwrap() {
-                    cx.local.keydata.hat |= HAT_MASK_LEFT;
-                }
-                if cx.local.pin_right.is_low().unwrap() {
-                    cx.local.keydata.hat |= HAT_MASK_RIGHT;
-                }
-
+                // Digital processing of analog sticks
+                // AS toggle set to left stick
                 if cx.local.pin_t_analog_left.is_low().unwrap() {
-                    // We should measure the analog stick and set the value
-                    cx.local.keydata.lx = 255;
-                    cx.local.keydata.ly = 255;
+                    if cx.local.pin_down.is_low().unwrap() {
+                        if cx.local.pin_up.is_low().unwrap() {
+                            cx.local.keydata.ly = 255;
+                        }
+                        else {
+                            cx.local.keydata.ly = 64;
+                        }
+                    }
+                    else if cx.local.pin_down.is_low().unwrap() {
+                        cx.local.keydata.ly = 0;
+                            
+                    }
+                    if cx.local.pin_left.is_low().unwrap() {
+                        if cx.local.pin_right.is_low().unwrap() {
+                            cx.local.keydata.lx = 64;
+                        }
+                        else{
+                            cx.local.keydata.lx = 0;
+                        }
+                    }
+                    else if cx.local.pin_right.is_low().unwrap() {
+                        cx.local.keydata.lx = 255;
+                    }
                 }
-                if cx.local.pin_t_analog_right.is_low().unwrap() {
-                    // We should measure the analog stick and set the value
-                    cx.local.keydata.rx = 255;
-                    cx.local.keydata.ry = 255;
+                // AS toggle set to right stick
+                else if cx.local.pin_t_analog_right.is_low().unwrap() {
+                    if cx.local.pin_down.is_low().unwrap() {
+                        if cx.local.pin_up.is_low().unwrap() {
+                            cx.local.keydata.ry = 255;
+                        }
+                        else {
+                            cx.local.keydata.ry = 64;
+                        }
+                    }
+                    else if cx.local.pin_down.is_low().unwrap() {
+                        cx.local.keydata.ry = 0;
+                            
+                    }
+                    if cx.local.pin_left.is_low().unwrap() {
+                        if cx.local.pin_right.is_low().unwrap() {
+                            cx.local.keydata.rx = 64;
+                        }
+                        else{
+                            cx.local.keydata.rx = 0;
+                        }
+                    }
+                    else if cx.local.pin_right.is_low().unwrap() {
+                        cx.local.keydata.rx = 255;
+                    }
+                // AS toggle not set, process D-Pad
+                } else {
+                    // Check up and down, clean SOCD
+                    if cx.local.pin_down.is_low().unwrap() {
+                        if cx.local.pin_up.is_low().unwrap() {
+                            cx.local.keydata.hat |= HAT_MASK_UP;
+                        }
+                        else {
+                            cx.local.keydata.hat |= HAT_MASK_DOWN;
+                        }
+                    }
+                    else if cx.local.pin_down.is_low().unwrap() {
+                        cx.local.keydata.hat |= HAT_MASK_DOWN;
+                            
+                    }
+                    // NOW LEFT AND RIGHT, still cleaning
+                    if cx.local.pin_left.is_low().unwrap() {
+                        cx.local.keydata.hat |= HAT_MASK_LEFT;
+                    }
+                    else if cx.local.pin_right.is_low().unwrap() {
+                        cx.local.keydata.hat |= HAT_MASK_RIGHT;
+                    }
                 }
             });
         }
     }
 
-    #[task(binds = USB_OTG1, shared = [ keys ], local = [ hid ])]
-    fn send_report(cx: send_report::Context) {
-        cx.shared.keys.lock(|keys: &mut PadReport| {
-            // Everything else happens implicitly. The bus is configured in init
-            cx.local.hid.send_report(&keys)
-        });
-    }
+    // #[task(binds = USB_OTG1, shared = [ keys ], local = [ hid ])]
+    // fn send_usb(mut cx: send_usb::Context) {
+    //     cx.shared.keys.lock(|keys: &mut PadReport| {
+    //         // Everything else happens implicitly. The bus is configured in init
+    //         cx.local.hid.send_report(&keys)
+    //     });
+    // }
 }

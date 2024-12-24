@@ -69,6 +69,13 @@ impl PadReport {
     pub fn clear_keys(&mut self) {
         self.bytes[0] = 0;
         self.bytes[1] = 0;
+        self.bytes[2] = 0;
+        // left stick set to neutral
+        self.bytes[4] = 128;
+        self.bytes[5] = 128;
+        // right stick set to neutral
+        self.bytes[6] = 128;
+        self.bytes[7] = 128;
     }
 
     pub fn send(&self) {
