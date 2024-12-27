@@ -1,24 +1,45 @@
 // Provide functionality to interact with USB devices.
+// spc == Switch Pro Controller
 
 // use usb_device::device::UsbDeviceBuilder;
 // use usb_device::prelude::*;
 // use usbd_hid_device::Hid::HidReport;
+use usbd_hid::{descriptor, hid_class};
 use usbd_hid_device::HidReport;
+use usbd_hid_macros::gen_hid_descriptor;
 
-// ALL THE MASKS ARE WRONG
-pub const KEY_MASK_A: u16 = 0x8000;
-pub const KEY_MASK_B: u16 = 0x4000;
-pub const KEY_MASK_X: u16 = 0x2000;
-pub const KEY_MASK_Y: u16 = 0x1000;
-pub const KEY_MASK_L1: u16 = 0x0800;
-pub const KEY_MASK_R1: u16 = 0x0400;
-pub const KEY_MASK_L2: u16 = 0x0200;
-pub const KEY_MASK_R2: u16 = 0x0100;
-pub const KEY_MASK_L3: u16 = 0x0080;
-pub const KEY_MASK_R3: u16 = 0x0040;
-pub const KEY_MASK_SELECT: u16 = 0x0020;
-pub const KEY_MASK_START: u16 = 0x0010;
-pub const KEY_MASK_HOME: u16 = 0x0008;
+/// Report types where serialized HID report descriptors are available.
+pub trait SerializedDescriptor {
+    fn desc() -> &'static [u8];
+}
+
+/// Report types which serialize into input reports, ready for transmission.
+pub trait AsInputReport: Serialize {}
+
+/// Prelude for modules which use the `gen_hid_descriptor` macro.
+pub mod generator_prelude {
+    pub use crate::descriptor::{AsInputReport, SerializedDescriptor};
+    pub use serde::ser::{Serialize, SerializeTuple, Serializer};
+    pub use usbd_hid_macros::gen_hid_descriptor;
+}
+use usbd_hid::descriptor::generator_prelude::{Serialize, SerializeTuple, Serializer};
+
+pub const KEY_MASK_A: u16 = 0x0004;
+pub const KEY_MASK_B: u16 = 0x0002;
+pub const KEY_MASK_X: u16 = 0x0008;
+pub const KEY_MASK_Y: u16 = 0x0001;
+pub const KEY_MASK_L1: u16 = 0x0010;
+pub const KEY_MASK_R1: u16 = 0x0020;
+pub const KEY_MASK_L2: u16 = 0x0040;
+pub const KEY_MASK_R2: u16 = 0x0080;
+pub const KEY_MASK_L3: u16 = 0x0400;
+pub const KEY_MASK_R3: u16 = 0x0800;
+pub const KEY_MASK_SELECT: u16 = 0x0100;
+pub const KEY_MASK_START: u16 = 0x0200;
+pub const KEY_MASK_HOME: u16 = 0x1000;
+// pub const KEY_MASK_CAP: u16 = 0x2000;
+
+const JOYSTICK: u16 = 0x0805;
 
 // Nintendo uses a hat switch to mark
 // dpad inputs which force SOCD cleaning in firmware
@@ -29,7 +50,7 @@ pub const HAT_MASK_UP: u8 = 0x01;
 pub const HAT_MASK_DOWN: u8 = 0x02;
 pub const HAT_MASK_LEFT: u8 = 0x04;
 pub const HAT_MASK_RIGHT: u8 = 0x08;
-pub const HAT_VALUES: [u8; 9] = [
+const HAT_VALUES: [u8; 9] = [
     1,  // up
     9,  // up-right
     8,  // right
@@ -40,8 +61,30 @@ pub const HAT_VALUES: [u8; 9] = [
     5,  // up-left
     0,  // neutral
 ];
+// Must account for every SOCD combination in one of these arrays.
+const SOCD_CODES: [u8; 7] = [
+    3,  // Up + Down
+    7,  // Sans-right
+    11, // Sans-left
+    12, // Left + Right
+    13, // Sans-down
+    14, // Sans-up
+    15, // All
+];
 
-#[derive(Debug, Copy, Clone)]
+// This feels wrong...
+#[gen_hid_descriptor(
+    (collection = APPLICATION, usage_page = GENERIC_DESKTOP, usage = 0x05) = {
+            #[item_settings data,variable,packed_bits 14] buttons=input;
+            #[item_settings data,variable] hat=input;
+            #[item_settings data] padding=input;
+            #[item_settings data,variable] lx=input;
+            #[item_settings data,variable] ly=input;
+            #[item_settings data,variable] rx=inpout;
+            #[item_settings data,variable] ry=input;
+    }
+)]
+#[allow(dead_code)]
 pub struct KeyData {
     pub buttons: u16,
     pub hat: u8,
@@ -94,8 +137,29 @@ impl PadReport {
         self.bytes[7] = 128;
     }
 
+    // For ease of processing, we use bitfields when measuring the dpad
+    // Nintendo uses a special hat encoding which implicitly scrubs SOCD
+    // to support that with minimal effort, this helper function sets the
+    // hat switch according to our directional bitfields
     pub fn set_hat(&mut self, dpad: u8) {
-        self.bytes[2] = HAT_VALUES.iter().position(|&r| r == dpad).unwrap() as u8;
+        // This is where we process SOCD using the following table.
+        // map to the list in HAT_VALUES around line 53
+        // 3 == up+down
+        // 7 == up+down+left
+        // 15 == all directions
+        // 14 == sans-up
+        // 13 == sans-down
+        // 12 == left+right
+        // 11 == right+up+down
+        let clean_dpad = match dpad {
+            3 => 1,       // up from up+down
+            7 | 13 => 5,  // up-left from sans-right and sans-down
+            11 | 15 => 9, // up-right from all-keys and sans-left
+            12 => 4,      // left from left+right (tekken left-side preference)
+            14 => 6,      // down-left from sans-up
+            _ => dpad,    // if we got anything else, it's already clean...?
+        };
+        self.bytes[2] = HAT_VALUES.iter().position(|&r| r == clean_dpad).unwrap() as u8;
     }
 
     pub fn send(&self) {

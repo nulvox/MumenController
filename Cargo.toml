@@ -11,6 +11,7 @@ rtic-monotonics = { version = "1", default-features = false, features = [
 
 imxrt-usbd = { version = "0.1" }
 usb-device = "0.2"
+usbd-hid = "0.8"
 usbd-hid-device = "0.1"
 embedded-hal = "1.0.0"
 
@@ -33,6 +34,9 @@ features = [
     # Use the BSP's runtime.
     "rt",
 ]
+
+[dependencies.usbd-hid-macros]
+version = "0.8.2"
 
 # Don't optimize build dependencies, like proc macros.
 # Helps with build times.

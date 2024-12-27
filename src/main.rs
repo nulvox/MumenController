@@ -1,66 +1,74 @@
-//! The starter code slowly blinks the LED and sets up
-//! USB logging. It periodically logs messages over USB.
+//! Demonstrates a USB keypress using RTIC.
 //!
-//! Despite targeting the Teensy 4.0, this starter code
-//! should also work on the Teensy 4.1 and Teensy MicroMod.
-//! You should eventually target your board! See inline notes.
-//!
-//! This template uses [RTIC v2](https://rtic.rs/2/book/en/)
-//! for structuring the application.
+//! Flash your board with this example. Your device will occasionally
+//! send some kind of keypress to your host.
 
 #![no_std]
 #![no_main]
 #![feature(generic_arg_infer)]
 
 use teensy4_panic as _;
-mod usb;
+mod spc;
 
-#[rtic::app(device = teensy4_bsp, peripherals = true, dispatchers = [KPP])]
+#[rtic::app(device = board, peripherals = false)]
 mod app {
-    use bsp::board;
-    use bsp::{
-        hal::{gpio, iomuxc, usbd},
-        // hal::{adc, gpio, iomuxc},
-        pins,
+    use hal::usbd::{BusAdapter, EndpointMemory, EndpointState, Speed};
+    use imxrt_hal as hal;
+
+    use usb_device::{
+        bus::UsbBusAllocator,
+        device::{UsbDevice, UsbDeviceBuilder, UsbDeviceState, UsbVidPid},
+    };
+    use usbd_hid::{
+        descriptor::{KeyboardReport, SerializedDescriptor as _},
+        hid_class::HIDClass,
     };
 
-    // use teensy4_bsp::ral::iomuxc;
-    // use teensy4_bsp::{self as bsp, hal::iomuxc::Pad};
-    use teensy4_bsp::{self as bsp};
 
-    // If you're using a Teensy 4.1 or MicroMod, you should eventually
-    // change 't40' to 't41' or micromod, respectively.
-    use board::t40 as my_board;
+    /// Change me if you want to play with a full-speed USB device.
+    const SPEED: Speed = Speed::full;
+    /// Taken from Switch Pro Controller lsusb
+    const VID_PID: UsbVidPid = UsbVidPid(0x057E, 0x2009);
+    const PRODUCT: &str = "mumen";
+    /// How frequently should we poll the logger?
+    /// // @TODO, what is the resolution here? This is the default value given to us by the example.
+    const LPUART_POLL_INTERVAL_MS: u32 = board::PIT_FREQUENCY / 1_000 * 100;
+    /// Change me to change how log messages are serialized.
+    ///
+    /// If changing to `Defmt`, you'll need to update the logging macros in
+    /// this example. You'll also need to make sure the USB device you're debugging
+    /// uses `defmt`.
+    const FRONTEND: board::logging::Frontend = board::logging::Frontend::Log;
+    /// The USB GPT timer we use to (infrequently) send mouse updates.
+    const GPT_INSTANCE: imxrt_usbd::gpt::Instance = imxrt_usbd::gpt::Instance::Gpt0;
+    /// How frequently should we push mouse updates to the host?
+    const MOUSE_UPDATE_INTERVAL_MS: u32 = 200;
 
-    // use rtic_monotonics::systick::{Systick, *};
-    use rtic_monotonics::systick::Systick;
-    use usb_device::prelude::*;
-    use crate::usb::*;
+    /// This allocation is shared across all USB endpoints. It needs to be large
+    /// enough to hold the maximum packet size for *all* endpoints. If you start
+    /// noticing panics, check to make sure that this is large enough for all endpoints.
+    static EP_MEMORY: EndpointMemory<1024> = EndpointMemory::new();
+    /// This manages the endpoints. It's large enough to hold the maximum number
+    /// of endpoints; we're not using all the endpoints in this example.
+    static EP_STATE: EndpointState = EndpointState::max_endpoints();
+
+    type Bus = BusAdapter;
 
     // use adc::AnalogInput;
     use embedded_hal::digital::InputPin;
+
+    use crate::spc;
     // use teensy4_bsp::hal::iomuxc::adc::Pin as AdcPin;
-
     const PIN_CONFIG: iomuxc::Config =
-        iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
-
-    // const ANALOG_PIN_CONFIG: iomuxc::Config = iomuxc::Config::zero()
-    //     .set_hysteresis(iomuxc::Hysteresis::Disabled)
-    //     .set_pull_keeper(None)
-    //     .set_open_drain(iomuxc::OpenDrain::Disabled)
-    //     .set_speed(iomuxc::Speed::Max)
-    //     .set_drive_strength(iomuxc::DriveStrength::R0_6)
-    //     .set_slew_rate(iomuxc::SlewRate::Slow);
-
-    #[shared]
-    struct Shared {
-        keys: PadReport,
-    }
-
-    /// These resources are local to individual tasks.
+    iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
     #[local]
     struct Local {
-        hid: usbd_hid_device::Hid<'static, UsbBus<UsbBusType>>,
+        class: HIDClass<'static, Bus>,
+        device: UsbDevice<'static, Bus>,
+        led: board::Led,
+        poller: board::logging::Poller,
+        timer: hal::pit::Pit<0>,
+        message: MessageIter,
         keydata: KeyData,
         pin_a: gpio::Input<pins::t40::P14>,
         pin_b: gpio::Input<pins::t40::P11>,
@@ -88,19 +96,29 @@ mod app {
         // pin_ly: adc::AnalogInput<pins::t40::P21, 8>,
     }
 
-    #[init]
-    fn init(cx: init::Context) -> (Shared, Local) {
-        let board::Resources {
-            mut gpio1,
-            mut gpio2,
-            // mut gpio3,
-            mut gpio4,
-            mut pins,
-            usb,
-            // adc1,
-            // adc2,
-            ..
-        } = my_board(cx.device);
+    #[shared]
+    struct Shared {
+        keys: PadReport,
+    }
+
+    #[init(local = [bus: Option<UsbBusAllocator<Bus>> = None])]
+    fn init(ctx: init::Context) -> (Shared, Local) {
+        let (
+            board::Common {
+                pit: (mut timer, _, _, _),
+                usb1,
+                usbnc1,
+                usbphy1,
+                mut dma,
+                mut gpio1,
+                mut gpio2,
+                mut gpio4,
+                mut pins,
+                ..
+            },
+            board::Specifics { led, console, .. },
+        ) = board::new();
+        // configure GPIO for the buttons
         iomuxc::configure(&mut pins.p0, PIN_CONFIG);
         iomuxc::configure(&mut pins.p1, PIN_CONFIG);
         iomuxc::configure(&mut pins.p2, PIN_CONFIG);
@@ -151,33 +169,57 @@ mod app {
         // let pin_lx: adc::AnalogInput<pins::t40::P20, 7> = adc::AnalogInput::new(pins.p20);
         // let pin_ly: adc::AnalogInput<pins::t40::P21, 8> = adc::AnalogInput::new(pins.p21);
 
-        // let adapter = usb_device::bus::UsbBus BusAdapter.new(usb, EP_MEMORY, EP_STATE);
-        let adapter = bsp::hal::usbd::BusAdapter::new(usb, buffer, state);
-        let hid = usbd_hid_device::Hid::new(&usb_bus, 3);
+        timer.set_load_timer_value(LPUART_POLL_INTERVAL_MS);
+        timer.set_interrupt_enable(true);
+        timer.enable();
 
-        // let usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1234, 0x5678))
-        //     .manufacturer("Manufacturer")
-        //     .product("Product")
-        //     .serial_number("SerialNumber")
-        //     .device_class(0)
-        //     .build();
+        let dma_a = dma[board::BOARD_DMA_A_INDEX].take().unwrap();
+        let poller = board::logging::lpuart(FRONTEND, console, dma_a);
 
-        let keydata: KeyData = KeyData {
-            buttons: 0,
-            hat: 0,
-            padding: 0,
-            lx: 0,
-            ly: 0,
-            rx: 0,
-            ry: 0,
+        let usbd = hal::usbd::Instances {
+            usb: usb1,
+            usbnc: usbnc1,
+            usbphy: usbphy1,
         };
-        let keys: PadReport = PadReport::new(&keydata);
-        Systick::start(
-            cx.core.SYST,
-            board::ARM_FREQUENCY,
-            rtic_monotonics::create_systick_token!(),
-        );
 
+        let bus = BusAdapter::with_speed(usbd, &EP_MEMORY, &EP_STATE, SPEED);
+        bus.set_interrupts(true);
+        bus.gpt_mut(GPT_INSTANCE, |gpt| {
+            gpt.stop();
+            gpt.clear_elapsed();
+            gpt.set_interrupt_enabled(true);
+            gpt.set_mode(imxrt_usbd::gpt::Mode::Repeat);
+            gpt.set_load(MOUSE_UPDATE_INTERVAL_MS * 1000);
+            gpt.reset();
+            gpt.run();
+        });
+
+        let bus = ctx.local.bus.insert(UsbBusAllocator::new(bus));
+        // Note that "4" correlates to a 1ms polling interval. Since this is a high speed
+        // device, bInterval is computed differently.
+        let class = HIDClass::new(bus, KeyboardReport::desc(), 4);
+        // @here, configure the usb-hid to use the one in usb.rs
+        //  the line above these comments likely neeeds to point at the types
+        //    which we define in usb.rs...
+        let device = UsbDeviceBuilder::new(bus, VID_PID)
+            .strings(&[usb_device::device::StringDescriptors::default().product(PRODUCT)])
+            .unwrap()
+            .device_class(usbd_hid::hid_class)
+            .max_packet_size_0(64)
+            .unwrap()
+            .build();
+
+        (
+            Shared {},
+            Local {
+                class,
+                device,
+                // led,
+                poller,
+                timer,
+                // message: MESSAGE.iter().cycle(),
+            },
+        );
         check_input::spawn().unwrap();
         (
             Shared { keys },
@@ -210,6 +252,58 @@ mod app {
                 // pin_ly,
             },
         )
+    }
+
+    #[task(binds = BOARD_PIT, local = [poller, timer], priority = 1)]
+    fn pit_interrupt(ctx: pit_interrupt::Context) {
+        while ctx.local.timer.is_elapsed() {
+            ctx.local.timer.clear_elapsed();
+        }
+
+        ctx.local.poller.poll();
+    }
+
+    #[task(binds = BOARD_USB1, local = [device, class, configured: bool = false], priority = 2)]
+    fn usb1(ctx: usb1::Context) {
+        let usb1::LocalResources {
+            class,
+            device,
+            // led,
+            configured,
+            // message,
+            ..
+        } = ctx.local;
+
+        device.poll(&mut [class]);
+
+        if device.state() == UsbDeviceState::Configured {
+            if !*configured {
+                device.bus().configure();
+            }
+            *configured = true;
+        } else {
+            *configured = false;
+        }
+
+        if *configured {
+            let elapsed = device.bus().gpt_mut(GPT_INSTANCE, |gpt| {
+                let elapsed = gpt.is_elapsed();
+                while gpt.is_elapsed() {
+                    gpt.clear_elapsed();
+                }
+                elapsed
+            });
+
+            if elapsed {
+                led.toggle();
+                let code = *message.next().unwrap();
+                if let Some(report) = translate_char(code) {
+                    class.push_input(&report).ok();
+                }
+                // @TODO this is where we pushed a char after 
+                //  the wait was done in the weird eldritch keybaord example...
+            }
+        }
     }
 
     #[task(shared = [ keys ], local = [ 
@@ -258,43 +352,46 @@ mod app {
                 // lets keep the closure open until we set all the keys.
                 // this prevents the system from generating a race condition with `keys`
                 if cx.local.pin_a.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_A;
+                    cx.local.keydata.buttons |= spc::KEY_MASK_A;
                 }
                 if cx.local.pin_b.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_B;
+                    cx.local.keydata.buttons |= spc::KEY_MASK_B;
                 }
                 if cx.local.pin_x.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_X;
+                    cx.local.keydata.buttons |= spc::KEY_MASK_X;
                 }
                 if cx.local.pin_y.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_Y;
+                    cx.local.keydata.buttons |= spc::KEY_MASK_Y;
                 }
                 if cx.local.pin_l1.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_L1;
+                    cx.local.keydata.buttons |= spc::KEY_MASK_L1;
                 }
                 if cx.local.pin_r1.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_R1;
+                    cx.local.keydata.buttons |= spc::KEY_MASK_R1;
                 }
                 if cx.local.pin_l2.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_L2;
+                    cx.local.keydata.buttons |= spc::KEY_MASK_L2;
                 }
                 if cx.local.pin_r2.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_R2;
+                    cx.local.keydata.buttons |= spc::KEY_MASK_R2;
                 }
                 if cx.local.pin_l3.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_L3;
+                    cx.local.keydata.buttons |= spc::KEY_MASK_L3;
                 }
                 if cx.local.pin_r3.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_R3;
+                    cx.local.keydata.buttons |= spc::KEY_MASK_R3;
                 }
-                if cx.local.pin_select.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_SELECT;
-                }
-                if cx.local.pin_start.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_START;
-                }
-                if cx.local.pin_home.is_low().unwrap() {
-                    cx.local.keydata.buttons |= KEY_MASK_HOME;
+                if cx.local.pin_lock.is_high().unwrap() {
+                    if cx.local.pin_select.is_low().unwrap() {
+                        cx.local.keydata.buttons |= spc::KEY_MASK_SELECT;
+                    }
+                    if cx.local.pin_start.is_low().unwrap() {
+                        cx.local.keydata.buttons |= spc::KEY_MASK_START;
+                    }
+                    if cx.local.pin_home.is_low().unwrap() {
+                        cx.local.keydata.buttons |= spc::KEY_MASK_HOME;
+                    }
+                    // If we add a capture pin, it would go here... 
                 }
                 // Digital processing of analog sticks
                 // AS toggle set to left stick
@@ -353,34 +450,26 @@ mod app {
                     // Check up and down, clean SOCD
                     if cx.local.pin_down.is_low().unwrap() {
                         if cx.local.pin_up.is_low().unwrap() {
-                            dpad |= HAT_MASK_UP;
+                            dpad |= spc::HAT_MASK_UP;
                         }
                         else {
-                            dpad |= HAT_MASK_DOWN;
+                            dpad |= spc::HAT_MASK_DOWN;
                         }
                     }
                     else if cx.local.pin_down.is_low().unwrap() {
-                        dpad |= HAT_MASK_DOWN;
+                        dpad |= spc::HAT_MASK_DOWN;
                             
                     }
                     // NOW LEFT AND RIGHT, still cleaning
                     if cx.local.pin_left.is_low().unwrap() {
-                        dpad |= HAT_MASK_LEFT;
+                        dpad |= spc::HAT_MASK_LEFT;
                     }
                     else if cx.local.pin_right.is_low().unwrap() {
-                        dpad |= HAT_MASK_RIGHT;
+                        dpad |= spc::HAT_MASK_RIGHT;
                     }
                     keys.set_hat(dpad);
                 }
             });
         }
     }
-
-    // #[task(binds = USB_OTG1, shared = [ keys ], local = [ hid ])]
-    // fn send_usb(mut cx: send_usb::Context) {
-    //     cx.shared.keys.lock(|keys: &mut PadReport| {
-    //         // Everything else happens implicitly. The bus is configured in init
-    //         cx.local.hid.send_report(&keys)
-    //     });
-    // }
 }
