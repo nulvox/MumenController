@@ -22,6 +22,7 @@ pub mod generator_prelude {
     pub use serde::ser::{Serialize, SerializeTuple, Serializer};
     pub use usbd_hid_macros::gen_hid_descriptor;
 }
+use crate::app::bsp::interrupt;
 use usbd_hid::descriptor::generator_prelude::{Serialize, SerializeTuple, Serializer};
 
 pub const KEY_MASK_A: u16 = 0x0004;

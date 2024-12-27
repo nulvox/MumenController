@@ -9,12 +9,12 @@ rtic-monotonics = { version = "1", default-features = false, features = [
     "cortex-m-systick",
 ] }
 
-imxrt-usbd = { version = "0.1" }
-imxrt-hal = "0.1"
-usb-device = "0.2"
-usbd-hid = "0.8"
-usbd-hid-device = "0.1"
-embedded-hal = "1.0.0"
+imxrt-usbd = { version = "^0.1" }
+imxrt-hal = "^0.5"
+usb-device = "^0.2"
+usbd-hid = "^0.8"
+usbd-hid-device = "^0.1"
+embedded-hal = "^1.0"
 
 # Remove these if you don't want logging.
 # imxrt-log = { version = "0.1", default-features = false, features = [
@@ -27,10 +27,10 @@ embedded-hal = "1.0.0"
 # ] }
 
 # teensy4-panic = { version = "0.2", features = ["log"] }
-teensy4-panic = "0.2"
+teensy4-panic = "^0.2"
 
 [dependencies.teensy4-bsp]
-version = "0.5"
+version = "^0.5"
 features = [
     # Use the BSP's runtime.
     "rt",

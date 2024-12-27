@@ -13,7 +13,7 @@ mod spc;
 #[rtic::app(device = board, peripherals = false)]
 mod app {
     use hal::usbd::{BusAdapter, EndpointMemory, EndpointState, Speed};
-    use imxrt_hal as hal;
+    // use imxrt_hal as hal;
 
     use usb_device::{
         bus::UsbBusAllocator,
@@ -24,11 +24,12 @@ mod app {
         hid_class::HIDClass,
     };
     use teensy4_bsp::{self as bsp};
-    use board::t40 as my_board;
+    // use board::t40 as my_board;
     use bsp::board;
     use bsp::{
-        hal::{gpio, iomuxc, usbd},
-        // hal::{adc, gpio, iomuxc},
+        hal::{gpio, iomuxc},
+        // hal::{gpio, iomuxc, usbd},
+        // hal::{adc, gpio, iomuxc, usbd},
         pins,
     };
 
@@ -72,7 +73,7 @@ mod app {
     iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
     #[local]
     struct Local {
-        class: HIDClass<'static, Bus>,
+        hid: HIDClass<'static, Bus>,
         device: UsbDevice<'static, Bus>,
         led: board::Led,
         poller: board::logging::Poller,
@@ -219,8 +220,30 @@ mod app {
             .build();
 
         (
-            Shared {},
+            Shared { keys },
             Local {
+                hid,
+                keydata,
+                pin_a,
+                pin_b,
+                pin_x,
+                pin_y,
+                pin_l1,
+                pin_r1,
+                pin_l2,
+                pin_r2,
+                pin_l3,
+                pin_r3,
+                pin_select,
+                pin_start,
+                pin_home,
+                pin_up,
+                pin_down,
+                pin_left,
+                pin_right,
+                pin_t_analog_left,
+                pin_t_analog_right,
+                pin_lock,
                 class,
                 device,
                 // led,
@@ -272,10 +295,10 @@ mod app {
     //     ctx.local.poller.poll();
     // }
 
-    #[task(binds = BOARD_USB1, local = [device, class, configured: bool = false], priority = 2)]
+    #[task(binds = BOARD_USB1, local = [device, hid, configured: bool = false], priority = 2)]
     fn usb1(ctx: usb1::Context) {
         let usb1::LocalResources {
-            class,
+            hid,
             device,
             // led,
             configured,
