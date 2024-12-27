@@ -23,6 +23,15 @@ mod app {
         descriptor::{KeyboardReport, SerializedDescriptor as _},
         hid_class::HIDClass,
     };
+    use teensy4_bsp::{self as bsp};
+    use board::t40 as my_board;
+    use bsp::board;
+    use bsp::{
+        hal::{gpio, iomuxc, usbd},
+        // hal::{adc, gpio, iomuxc},
+        pins,
+    };
+
 
 
     /// Change me if you want to play with a full-speed USB device.
@@ -38,11 +47,11 @@ mod app {
     /// If changing to `Defmt`, you'll need to update the logging macros in
     /// this example. You'll also need to make sure the USB device you're debugging
     /// uses `defmt`.
-    const FRONTEND: board::logging::Frontend = board::logging::Frontend::Log;
+    // const FRONTEND: board::logging::Frontend = board::logging::Frontend::Log;
     /// The USB GPT timer we use to (infrequently) send mouse updates.
-    const GPT_INSTANCE: imxrt_usbd::gpt::Instance = imxrt_usbd::gpt::Instance::Gpt0;
+    // const GPT_INSTANCE: imxrt_usbd::gpt::Instance = imxrt_usbd::gpt::Instance::Gpt0;
     /// How frequently should we push mouse updates to the host?
-    const MOUSE_UPDATE_INTERVAL_MS: u32 = 200;
+    // const MOUSE_UPDATE_INTERVAL_MS: u32 = 200;
 
     /// This allocation is shared across all USB endpoints. It needs to be large
     /// enough to hold the maximum packet size for *all* endpoints. If you start
@@ -173,8 +182,8 @@ mod app {
         timer.set_interrupt_enable(true);
         timer.enable();
 
-        let dma_a = dma[board::BOARD_DMA_A_INDEX].take().unwrap();
-        let poller = board::logging::lpuart(FRONTEND, console, dma_a);
+        // let dma_a = dma[board::BOARD_DMA_A_INDEX].take().unwrap();
+        // let poller = board::logging::lpuart(FRONTEND, console, dma_a);
 
         let usbd = hal::usbd::Instances {
             usb: usb1,
@@ -184,15 +193,15 @@ mod app {
 
         let bus = BusAdapter::with_speed(usbd, &EP_MEMORY, &EP_STATE, SPEED);
         bus.set_interrupts(true);
-        bus.gpt_mut(GPT_INSTANCE, |gpt| {
-            gpt.stop();
-            gpt.clear_elapsed();
-            gpt.set_interrupt_enabled(true);
-            gpt.set_mode(imxrt_usbd::gpt::Mode::Repeat);
-            gpt.set_load(MOUSE_UPDATE_INTERVAL_MS * 1000);
-            gpt.reset();
-            gpt.run();
-        });
+        // bus.gpt_mut(GPT_INSTANCE, |gpt| {
+        //     gpt.stop();
+        //     gpt.clear_elapsed();
+        //     gpt.set_interrupt_enabled(true);
+        //     gpt.set_mode(imxrt_usbd::gpt::Mode::Repeat);
+        //     gpt.set_load(MOUSE_UPDATE_INTERVAL_MS * 1000);
+        //     gpt.reset();
+        //     gpt.run();
+        // });
 
         let bus = ctx.local.bus.insert(UsbBusAllocator::new(bus));
         // Note that "4" correlates to a 1ms polling interval. Since this is a high speed
@@ -215,8 +224,8 @@ mod app {
                 class,
                 device,
                 // led,
-                poller,
-                timer,
+                // poller,
+                // timer,
                 // message: MESSAGE.iter().cycle(),
             },
         );
@@ -254,14 +263,14 @@ mod app {
         )
     }
 
-    #[task(binds = BOARD_PIT, local = [poller, timer], priority = 1)]
-    fn pit_interrupt(ctx: pit_interrupt::Context) {
-        while ctx.local.timer.is_elapsed() {
-            ctx.local.timer.clear_elapsed();
-        }
+    // #[task(binds = BOARD_PIT, local = [poller, timer], priority = 1)]
+    // fn pit_interrupt(ctx: pit_interrupt::Context) {
+    //     while ctx.local.timer.is_elapsed() {
+    //         ctx.local.timer.clear_elapsed();
+    //     }
 
-        ctx.local.poller.poll();
-    }
+    //     ctx.local.poller.poll();
+    // }
 
     #[task(binds = BOARD_USB1, local = [device, class, configured: bool = false], priority = 2)]
     fn usb1(ctx: usb1::Context) {
@@ -286,23 +295,23 @@ mod app {
         }
 
         if *configured {
-            let elapsed = device.bus().gpt_mut(GPT_INSTANCE, |gpt| {
-                let elapsed = gpt.is_elapsed();
-                while gpt.is_elapsed() {
-                    gpt.clear_elapsed();
-                }
-                elapsed
-            });
+            // let elapsed = device.bus().gpt_mut(GPT_INSTANCE, |gpt| {
+            //     let elapsed = gpt.is_elapsed();
+            //     while gpt.is_elapsed() {
+            //         gpt.clear_elapsed();
+            //     }
+            //     elapsed
+            // });
 
-            if elapsed {
-                led.toggle();
-                let code = *message.next().unwrap();
-                if let Some(report) = translate_char(code) {
+            // if elapsed {
+                // led.toggle();
+                // let code = *message.next().unwrap();
+                // if let Some(report) = translate_char(code) {
                     class.push_input(&report).ok();
-                }
+                // }
                 // @TODO this is where we pushed a char after 
                 //  the wait was done in the weird eldritch keybaord example...
-            }
+            // }
         }
     }
 
@@ -394,7 +403,7 @@ mod app {
                     // If we add a capture pin, it would go here... 
                 }
                 // Digital processing of analog sticks
-                // AS toggle set to left stick
+                // AnalogStick toggle set to left stick
                 if cx.local.pin_t_analog_left.is_low().unwrap() {
                     if cx.local.pin_down.is_low().unwrap() {
                         if cx.local.pin_up.is_low().unwrap() {
@@ -420,7 +429,7 @@ mod app {
                         cx.local.keydata.lx = 255;
                     }
                 }
-                // AS toggle set to right stick
+                // AnalogStick toggle set to right stick
                 else if cx.local.pin_t_analog_right.is_low().unwrap() {
                     if cx.local.pin_down.is_low().unwrap() {
                         if cx.local.pin_up.is_low().unwrap() {

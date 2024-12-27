@@ -10,6 +10,7 @@ rtic-monotonics = { version = "1", default-features = false, features = [
 ] }
 
 imxrt-usbd = { version = "0.1" }
+imxrt-hal = "0.1"
 usb-device = "0.2"
 usbd-hid = "0.8"
 usbd-hid-device = "0.1"
