@@ -36,7 +36,7 @@ mod app {
 
 
     /// Change me if you want to play with a full-speed USB device.
-    const SPEED: Speed = Speed::full;
+    const SPEED: Speed = Speed::High;
     /// Taken from Switch Pro Controller lsusb
     const VID_PID: UsbVidPid = UsbVidPid(0x057E, 0x2009);
     const PRODUCT: &str = "mumen";
