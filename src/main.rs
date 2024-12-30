@@ -13,7 +13,7 @@ mod spc;
 #[rtic::app(device = board, peripherals = false)]
 mod app {
     use hal::usbd::{BusAdapter, EndpointMemory, EndpointState, Speed};
-    // use imxrt_hal as hal;
+    use imxrt_hal as hal;
 
     use usb_device::{
         bus::UsbBusAllocator,
@@ -24,11 +24,11 @@ mod app {
         hid_class::HIDClass,
     };
     use teensy4_bsp::{self as bsp};
-    // use board::t40 as my_board;
+    use board::t40 as my_board;
     use bsp::board;
     use bsp::{
         hal::{gpio, iomuxc},
-        // hal::{gpio, iomuxc, usbd},
+        hal::{gpio, iomuxc, usbd},
         // hal::{adc, gpio, iomuxc, usbd},
         pins,
     };
