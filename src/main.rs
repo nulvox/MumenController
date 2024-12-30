@@ -75,10 +75,10 @@ mod app {
     struct Local {
         hid: HIDClass<'static, Bus>,
         device: UsbDevice<'static, Bus>,
-        led: board::Led,
-        poller: board::logging::Poller,
+        // led: board::Led,
+        // poller: board::logging::Poller,
         timer: hal::pit::Pit<0>,
-        message: MessageIter,
+        // message: MessageIter,
         keydata: KeyData,
         pin_a: gpio::Input<pins::t40::P14>,
         pin_b: gpio::Input<pins::t40::P11>,
