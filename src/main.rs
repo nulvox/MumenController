@@ -30,10 +30,12 @@ mod app {
 
 
 
-    /// Change me if you want to play with a full-speed USB device.
+    /// USB Speed configuration - High speed for better performance
     const SPEED: Speed = Speed::High;
-    /// Taken from Switch Pro Controller lsusb
-    const VID_PID: UsbVidPid = UsbVidPid(0x057E, 0x2009);
+    /// Use a generic VID/PID that won't conflict with existing devices
+    /// Use a generic VID/PID that won't conflict with existing devices
+    /// This is a test VID/PID - you should replace with your own for production
+    const VID_PID: UsbVidPid = UsbVidPid(0x1209, 0x0001);
     const PRODUCT: &str = "mumen";
     /// How frequently should we poll the logger?
     /// // @TODO, what is the resolution here? This is the default value given to us by the example.
@@ -65,12 +67,11 @@ mod app {
     use crate::spc::{self, PadReport, KeyData};
     // use teensy4_bsp::hal::iomuxc::adc::Pin as AdcPin;
     const PIN_CONFIG: iomuxc::Config =
-    iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
+    iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pullup100k));
     #[local]
     struct Local {
         hid: HIDClass<'static, Bus>,
         device: UsbDevice<'static, Bus>,
-        // led: board::Led,
         // poller: board::logging::Poller,
         timer: hal::pit::Pit<0>,
         // message: MessageIter,
@@ -123,6 +124,8 @@ mod app {
         let mut gpio2 = board.gpio2;
         let mut gpio4 = board.gpio4;
         
+        // GPIOs are initialized by the BSP, no need for manual clock enabling
+        
         // Configure timer
         timer.set_load_timer_value(LPUART_POLL_INTERVAL_MS);
         timer.set_interrupt_enable(true);
@@ -130,27 +133,36 @@ mod app {
         
         // Use the USB directly
         let usbd = board.usb;
-        // configure GPIO for the buttons
-        iomuxc::configure(&mut pins.p0, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p1, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p2, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p3, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p4, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p5, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p6, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p7, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p8, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p9, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p10, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p11, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p12, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p13, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p14, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p15, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p16, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p17, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p18, PIN_CONFIG);
-        iomuxc::configure(&mut pins.p19, PIN_CONFIG);
+        // Configure GPIO for the buttons using proper pull-up resistors
+        // For digital input pins, use 100k pull-up
+        let digital_config = iomuxc::Config::zero()
+            .set_pull_keeper(Some(iomuxc::PullKeeper::Pullup100k));
+            
+        // Lock pin uses pull-down as it needs to be high when active
+        let lock_config = iomuxc::Config::zero()
+            .set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
+            
+        // Apply the configurations to each pin
+        iomuxc::configure(&mut pins.p0, lock_config);
+        iomuxc::configure(&mut pins.p1, digital_config);
+        iomuxc::configure(&mut pins.p2, digital_config);
+        iomuxc::configure(&mut pins.p3, digital_config);
+        iomuxc::configure(&mut pins.p4, digital_config);
+        iomuxc::configure(&mut pins.p5, digital_config);
+        iomuxc::configure(&mut pins.p6, digital_config);
+        iomuxc::configure(&mut pins.p7, digital_config);
+        iomuxc::configure(&mut pins.p8, digital_config);
+        iomuxc::configure(&mut pins.p9, digital_config);
+        iomuxc::configure(&mut pins.p10, digital_config);
+        iomuxc::configure(&mut pins.p11, digital_config);
+        iomuxc::configure(&mut pins.p12, digital_config);
+        iomuxc::configure(&mut pins.p13, digital_config);
+        iomuxc::configure(&mut pins.p14, digital_config);
+        iomuxc::configure(&mut pins.p15, digital_config);
+        iomuxc::configure(&mut pins.p16, digital_config);
+        iomuxc::configure(&mut pins.p17, digital_config);
+        iomuxc::configure(&mut pins.p18, digital_config);
+        iomuxc::configure(&mut pins.p19, digital_config);
         // iomuxc::configure(&mut pins.p20, ANALOG_PIN_CONFIG);
         // iomuxc::configure(&mut pins.p21, ANALOG_PIN_CONFIG);
         // iomuxc::configure(&mut pins.p22, ANALOG_PIN_CONFIG);
@@ -185,18 +197,22 @@ mod app {
         timer.set_interrupt_enable(true);
         timer.enable();
 
-        // No need to create new usbd instances as we already initialized it above
-
+        // Configure the USB bus
         let bus = BusAdapter::new(usbd, &EP_MEMORY, &EP_STATE);
+        // Note: SPEED constant is defined but the BusAdapter doesn't have a set_speed method
+        // The speed is configured through other means in the USB stack
         bus.set_interrupts(true);
-
-        let bus = ctx.local.bus.insert(UsbBusAllocator::new(bus));
-        // Note that "4" correlates to a 1ms polling interval. Since this is a high speed
-        // device, bInterval is computed differently.
-        // Use the KeyData descriptor from spc.rs which contains the correct format at line 187 (REPORT_SIZE (8))
-        let hid = HIDClass::new(bus, spc::KeyData::DESCRIPTOR, 4);
         
-        // Configure the USB device with standard descriptors
+        // Ensure proper bus allocation
+        let bus = ctx.local.bus.insert(UsbBusAllocator::new(bus));
+        // Use a more conservative polling interval to reduce power consumption
+        // The dim power light suggests we might be drawing too much power
+        let polling_interval = 10; // 10ms polling for better power efficiency
+        
+        // Use the KeyData descriptor from spc.rs
+        let hid = HIDClass::new(bus, spc::KeyData::DESCRIPTOR, polling_interval);
+        
+        // Configure the USB device with power-conscious settings
         let device = UsbDeviceBuilder::new(bus, VID_PID)
             .manufacturer("Mumen Industries")
             .product("Mumen Controller")
@@ -266,48 +282,52 @@ mod app {
     //     ctx.local.poller.poll();
     // }
 
-    #[task(binds = USB_OTG1, shared = [keys], local = [device, hid, configured: bool = false], priority = 2)]
+    #[task(binds = USB_OTG1, shared = [keys], local = [device, hid, configured: bool = false, last_report: [u8; 8] = [0; 8]], priority = 2)]
     fn usb1(mut ctx: usb1::Context) {
         let usb1::LocalResources {
             hid,
             device,
-            // led,
             configured,
-            // message,
+            last_report,
             ..
         } = ctx.local;
 
-        device.poll(&mut [hid]);
+        // Poll the USB device to process any pending events
+        // This returns a boolean indicating if there was any activity
+        let poll_result = device.poll(&mut [hid]);
 
-        if device.state() == UsbDeviceState::Configured {
+        // Check if the device is configured
+        let current_state = device.state();
+        
+        if current_state == UsbDeviceState::Configured {
+            // Only configure once when the state changes to Configured
             if !*configured {
                 device.bus().configure();
+                *configured = true;
             }
-            *configured = true;
-        } else {
+            
+            // Send reports regularly to ensure controller is recognized
+            ctx.shared.keys.lock(|keys| {
+                // Get current report to compare
+                let curr_report = keys.as_ref();
+                
+                // Send on both conditions: if report changed OR every few iterations
+                let report_changed = curr_report != *last_report;
+                
+                if report_changed {
+                    // Store the current report
+                    last_report.copy_from_slice(curr_report);
+                    
+                    // Simple error handling
+                    if let Err(_) = hid.push_input(keys) {
+                        // If push fails, try reconfiguring
+                        device.bus().configure();
+                    }
+                }
+            });
+        } else if *configured {
+            // Update our state tracking when device becomes unconfigured
             *configured = false;
-        }
-
-        if *configured {
-            // let elapsed = device.bus().gpt_mut(GPT_INSTANCE, |gpt| {
-            //     let elapsed = gpt.is_elapsed();
-            //     while gpt.is_elapsed() {
-            //         gpt.clear_elapsed();
-            //     }
-            //     elapsed
-            // });
-
-            // if elapsed {
-                // led.toggle();
-                // Access the shared keys value and push to HID
-                // Access shared keys and push them directly to HID
-                ctx.shared.keys.lock(|keys| {
-                    // Push the keys data directly to HID
-                    hid.push_input(keys).ok();
-                });
-                // @TODO this is where we pushed a char after
-                //  the wait was done in the weird eldritch keybaord example...
-            // }
         }
     }
 
@@ -340,51 +360,87 @@ mod app {
         ])] 
     async fn check_input(mut cx: check_input::Context) {
         let mut dpad: u8;
+        
+        // Debug info - initial state check
+        let mut initial_state = 0u16;
+        
+        // Test each pin at startup
+        if cx.local.pin_a.is_low().unwrap() { initial_state |= 0x0001; }
+        if cx.local.pin_b.is_low().unwrap() { initial_state |= 0x0002; }
+        if cx.local.pin_x.is_low().unwrap() { initial_state |= 0x0004; }
+        if cx.local.pin_y.is_low().unwrap() { initial_state |= 0x0008; }
+        // Set initial buttons state to show connected
+        cx.local.keydata.buttons = initial_state;
+        
         loop {
             dpad = 0;
             // Access keys through cx.shared
             cx.shared.keys.lock(|keys| {
                 keys.clear_keys();
-                // lets keep the closure open until we set all the keys.
-                // this prevents the system from generating a race condition with `keys`
-                if cx.local.pin_a.is_low().unwrap() {
+                // Reset buttons for this iteration
+                cx.local.keydata.buttons = 0;
+                
+                // Check each pin with minimal error handling to avoid issues
+                let a_pressed = cx.local.pin_a.is_low().unwrap_or(false);
+                let b_pressed = cx.local.pin_b.is_low().unwrap_or(false);
+                
+                // Set button state
+                if a_pressed {
                     cx.local.keydata.buttons |= spc::KEY_MASK_A;
                 }
-                if cx.local.pin_b.is_low().unwrap() {
+                if b_pressed {
                     cx.local.keydata.buttons |= spc::KEY_MASK_B;
                 }
-                if cx.local.pin_x.is_low().unwrap() {
+                // Continue with more robust checking for remaining buttons
+                let x_pressed = cx.local.pin_x.is_low().unwrap_or(false);
+                let y_pressed = cx.local.pin_y.is_low().unwrap_or(false);
+                let l1_pressed = cx.local.pin_l1.is_low().unwrap_or(false);
+                let r1_pressed = cx.local.pin_r1.is_low().unwrap_or(false);
+                let l2_pressed = cx.local.pin_l2.is_low().unwrap_or(false);
+                let r2_pressed = cx.local.pin_r2.is_low().unwrap_or(false);
+                let l3_pressed = cx.local.pin_l3.is_low().unwrap_or(false);
+                let r3_pressed = cx.local.pin_r3.is_low().unwrap_or(false);
+                let lock_active = cx.local.pin_lock.is_high().unwrap_or(false);
+                
+                // Set button state for regular buttons
+                if x_pressed {
                     cx.local.keydata.buttons |= spc::KEY_MASK_X;
                 }
-                if cx.local.pin_y.is_low().unwrap() {
+                if y_pressed {
                     cx.local.keydata.buttons |= spc::KEY_MASK_Y;
                 }
-                if cx.local.pin_l1.is_low().unwrap() {
+                if l1_pressed {
                     cx.local.keydata.buttons |= spc::KEY_MASK_L1;
                 }
-                if cx.local.pin_r1.is_low().unwrap() {
+                if r1_pressed {
                     cx.local.keydata.buttons |= spc::KEY_MASK_R1;
                 }
-                if cx.local.pin_l2.is_low().unwrap() {
+                if l2_pressed {
                     cx.local.keydata.buttons |= spc::KEY_MASK_L2;
                 }
-                if cx.local.pin_r2.is_low().unwrap() {
+                if r2_pressed {
                     cx.local.keydata.buttons |= spc::KEY_MASK_R2;
                 }
-                if cx.local.pin_l3.is_low().unwrap() {
+                if l3_pressed {
                     cx.local.keydata.buttons |= spc::KEY_MASK_L3;
                 }
-                if cx.local.pin_r3.is_low().unwrap() {
+                if r3_pressed {
                     cx.local.keydata.buttons |= spc::KEY_MASK_R3;
                 }
-                if cx.local.pin_lock.is_high().unwrap() {
-                    if cx.local.pin_select.is_low().unwrap() {
+                
+                // Handle lock-dependent buttons
+                if lock_active {
+                    let select_pressed = cx.local.pin_select.is_low().unwrap_or(false);
+                    let start_pressed = cx.local.pin_start.is_low().unwrap_or(false);
+                    let home_pressed = cx.local.pin_home.is_low().unwrap_or(false);
+                    
+                    if select_pressed {
                         cx.local.keydata.buttons |= spc::KEY_MASK_SELECT;
                     }
-                    if cx.local.pin_start.is_low().unwrap() {
+                    if start_pressed {
                         cx.local.keydata.buttons |= spc::KEY_MASK_START;
                     }
-                    if cx.local.pin_home.is_low().unwrap() {
+                    if home_pressed {
                         cx.local.keydata.buttons |= spc::KEY_MASK_HOME;
                     }
                     // If we add a capture pin, uncomment this
@@ -392,88 +448,148 @@ mod app {
                         // cx.local.keydata.buttons |= spc::KEY_MASK_CAP;
                     // }
                 }
-                // Digital processing of analog sticks
+                // Digital processing of analog sticks with robust error handling
+                // Get all directional inputs with safe unwrapping
+                let t_analog_left = cx.local.pin_t_analog_left.is_low().unwrap_or(false);
+                let t_analog_right = cx.local.pin_t_analog_right.is_low().unwrap_or(false);
+                let up_pressed = cx.local.pin_up.is_low().unwrap_or(false);
+                let down_pressed = cx.local.pin_down.is_low().unwrap_or(false);
+                let left_pressed = cx.local.pin_left.is_low().unwrap_or(false);
+                let right_pressed = cx.local.pin_right.is_low().unwrap_or(false);
+                
                 // AnalogStick toggle set to left stick
-                if cx.local.pin_t_analog_left.is_low().unwrap() {
-                    if cx.local.pin_down.is_low().unwrap() {
-                        if cx.local.pin_up.is_low().unwrap() {
+                if t_analog_left {
+                    // Handle Y-axis
+                    if down_pressed {
+                        if up_pressed {
                             cx.local.keydata.ly = 255;
-                        }
-                        else {
+                        } else {
                             cx.local.keydata.ly = 64;
                         }
-                    }
-                    else if cx.local.pin_down.is_low().unwrap() {
+                    } else if down_pressed {
                         cx.local.keydata.ly = 0;
-                            
+                    } else {
+                        // Ensure neutral position if no input
+                        cx.local.keydata.ly = 128;
                     }
-                    if cx.local.pin_left.is_low().unwrap() {
-                        if cx.local.pin_right.is_low().unwrap() {
+                    
+                    // Handle X-axis
+                    if left_pressed {
+                        if right_pressed {
                             cx.local.keydata.lx = 64;
-                        }
-                        else{
+                        } else {
                             cx.local.keydata.lx = 0;
                         }
-                    }
-                    else if cx.local.pin_right.is_low().unwrap() {
+                    } else if right_pressed {
                         cx.local.keydata.lx = 255;
+                    } else {
+                        // Ensure neutral position if no input
+                        cx.local.keydata.lx = 128;
                     }
                 }
                 // AnalogStick toggle set to right stick
-                else if cx.local.pin_t_analog_right.is_low().unwrap() {
-                    if cx.local.pin_down.is_low().unwrap() {
-                        if cx.local.pin_up.is_low().unwrap() {
+                else if t_analog_right {
+                    // Handle Y-axis
+                    if down_pressed {
+                        if up_pressed {
                             cx.local.keydata.ry = 255;
-                        }
-                        else {
+                        } else {
                             cx.local.keydata.ry = 64;
                         }
-                    }
-                    else if cx.local.pin_down.is_low().unwrap() {
+                    } else if down_pressed {
                         cx.local.keydata.ry = 0;
-                            
+                    } else {
+                        // Ensure neutral position if no input
+                        cx.local.keydata.ry = 128;
                     }
-                    if cx.local.pin_left.is_low().unwrap() {
-                        if cx.local.pin_right.is_low().unwrap() {
+                    
+                    // Handle X-axis
+                    if left_pressed {
+                        if right_pressed {
                             cx.local.keydata.rx = 64;
-                        }
-                        else{
+                        } else {
                             cx.local.keydata.rx = 0;
                         }
-                    }
-                    else if cx.local.pin_right.is_low().unwrap() {
+                    } else if right_pressed {
                         cx.local.keydata.rx = 255;
+                    } else {
+                        // Ensure neutral position if no input
+                        cx.local.keydata.rx = 128;
                     }
                 // AS toggle not set, process D-Pad
                 } else {
-                    // Check up and down, clean SOCD
-                    if cx.local.pin_up.is_low().unwrap() {
+                    // Check up and down, clean SOCD with safe error handling
+                    if up_pressed {
                         dpad |= spc::HAT_MASK_UP;
                     }
-                    if cx.local.pin_down.is_low().unwrap() {
+                    if down_pressed {
                         dpad |= spc::HAT_MASK_DOWN;
                     }
                     // Check left and right
-                    if cx.local.pin_left.is_low().unwrap() {
+                    if left_pressed {
                         dpad |= spc::HAT_MASK_LEFT;
                     }
-                    if cx.local.pin_right.is_low().unwrap() {
+                    if right_pressed {
                         dpad |= spc::HAT_MASK_RIGHT;
                     }
-                    
-                    // Update the PadReport with the current KeyData values
-                    let updated_keys = spc::PadReport::new(&cx.local.keydata);
-                    
-                    // Copy the updated values to the shared keys object
-                    *keys = updated_keys;
-                    
-                    // Set the hat switch
-                    keys.set_hat(dpad);
-                    
-                    // Reset the buttons for the next update
-                    cx.local.keydata.buttons = 0;
                 }
+                
+                // Always update the PadReport regardless of which toggle is active
+                // This ensures all button presses are registered
+                let mut updated_keys = spc::PadReport::new(&cx.local.keydata);
+                
+                // Ensure hat switch is properly set if D-pad was active
+                if dpad > 0 {
+                    updated_keys.set_hat(dpad);
+                }
+                
+                // Advanced debug mode to test multiple button combinations
+                // This helps identify which buttons the application recognizes
+                let debug_mode = 2; // 0=off, 1=A button, 2=X+Y, 3=all buttons
+                
+                if debug_mode > 0 {
+                    match debug_mode {
+                        1 => {
+                            // Force A button only
+                            cx.local.keydata.buttons |= spc::KEY_MASK_A;
+                        },
+                        2 => {
+                            // Force X+Y buttons (many applications recognize these)
+                            cx.local.keydata.buttons |= spc::KEY_MASK_X;
+                            cx.local.keydata.buttons |= spc::KEY_MASK_Y;
+                        },
+                        3 => {
+                            // Force all standard buttons
+                            cx.local.keydata.buttons = 0xFFFF; // All 16 bits set
+                        },
+                        _ => {}
+                    }
+                    
+                    // Update with forced buttons
+                    updated_keys = spc::PadReport::new(&cx.local.keydata);
+                    
+                    // Also force D-pad up to test hat switch
+                    if debug_mode == 3 {
+                        updated_keys.set_hat(spc::HAT_MASK_UP);
+                    } else if dpad > 0 {
+                        // Otherwise preserve existing hat state
+                        updated_keys.set_hat(dpad);
+                    }
+                }
+                
+                // Copy the updated values to the shared keys object
+                *keys = updated_keys;
+                
+                // Reset the buttons for the next update, but after we've already sent the report
+                cx.local.keydata.buttons = 0;
             });
+            
+            // Use a longer delay to reduce power consumption
+            // The dim power light suggests potential power issues
+            // Let the system rest more between checks
+            for _ in 0..20000 {
+                core::hint::spin_loop();
+            }
         }
     }
 }

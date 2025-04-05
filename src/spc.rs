@@ -107,11 +107,14 @@ pub struct PadReport {
 
 impl PadReport {
     pub fn new(btnstate: &KeyData) -> Self {
-        let btnarray = btnstate.buttons.to_be_bytes();
+        // Use little-endian byte order for USB HID compatibility
+        let btnarray = btnstate.buttons.to_le_bytes();
+        
+        // Create a properly formatted report
         PadReport {
             bytes: [
-                btnarray[0],
-                btnarray[1],
+                btnarray[0], // Low byte of buttons
+                btnarray[1], // High byte of buttons
                 btnstate.hat,
                 0x00, // padding for hat switch
                 btnstate.lx,
@@ -172,11 +175,13 @@ impl AsRef<[u8]> for PadReport {
 
 // Implement HidReport for KeyData
 impl HidReport for KeyData {
-    // Use the HID descriptor content as found on line 187 of spc.rs
+    // Fixed descriptor that properly handles hat switch and matches our data structure
     const DESCRIPTOR: &'static [u8] = &[
         0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
-        0x09, 0x05,        // USAGE (Joystick)
+        0x09, 0x05,        // USAGE (Gamepad)
         0xA1, 0x01,        // COLLECTION (Application)
+        
+        // Buttons (16 bits)
         0x15, 0x00,        // LOGICAL_MINIMUM (0)
         0x25, 0x01,        // LOGICAL_MAXIMUM (1)
         0x75, 0x01,        // REPORT_SIZE (1)
@@ -185,25 +190,42 @@ impl HidReport for KeyData {
         0x19, 0x01,        // USAGE_MINIMUM (Button 1)
         0x29, 0x10,        // USAGE_MAXIMUM (Button 16)
         0x81, 0x02,        // INPUT (Data,Var,Abs)
-        0x75, 0x08,        // REPORT_SIZE (8) - THIS IS LINE 187
-        0x95, 0x01,        // REPORT_COUNT (1)
-        0x81, 0x01,        // INPUT (Cnst,Ary,Abs)
+        
+        // Hat switch (8 bits)
         0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
-        0x09, 0x30,        // USAGE (X)
-        0x09, 0x31,        // USAGE (Y)
-        0x09, 0x32,        // USAGE (Z)
-        0x09, 0x33,        // USAGE (Rx)
+        0x09, 0x39,        // USAGE (Hat switch)
+        0x15, 0x00,        // LOGICAL_MINIMUM (0)
+        0x25, 0x07,        // LOGICAL_MAXIMUM (7)
+        0x35, 0x00,        // PHYSICAL_MINIMUM (0)
+        0x46, 0x3B, 0x01,  // PHYSICAL_MAXIMUM (315)
+        0x65, 0x14,        // UNIT (Eng Rot:Angular Pos)
+        0x75, 0x08,        // REPORT_SIZE (8)
+        0x95, 0x01,        // REPORT_COUNT (1)
+        0x81, 0x02,        // INPUT (Data,Var,Abs)
+        
+        // Padding (8 bits)
+        0x75, 0x08,        // REPORT_SIZE (8)
+        0x95, 0x01,        // REPORT_COUNT (1)
+        0x81, 0x03,        // INPUT (Cnst,Var,Abs)
+        
+        // Analog sticks (4 axes, 8 bits each)
+        0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
+        0x09, 0x30,        // USAGE (X) - Left stick X
+        0x09, 0x31,        // USAGE (Y) - Left stick Y
+        0x09, 0x32,        // USAGE (Z) - Right stick X
+        0x09, 0x35,        // USAGE (Rz) - Right stick Y
         0x15, 0x00,        // LOGICAL_MINIMUM (0)
         0x26, 0xFF, 0x00,  // LOGICAL_MAXIMUM (255)
         0x75, 0x08,        // REPORT_SIZE (8)
         0x95, 0x04,        // REPORT_COUNT (4)
         0x81, 0x02,        // INPUT (Data,Var,Abs)
+        
         0xC0               // END_COLLECTION
     ];
 }
-// Make PadReport use the same descriptor as KeyData, using the HID report format from line 187
+
+// Make PadReport use the same descriptor as KeyData
 impl HidReport for PadReport {
-    // Use the exact same descriptor as KeyData
     const DESCRIPTOR: &'static [u8] = KeyData::DESCRIPTOR;
 }
 
