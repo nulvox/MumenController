@@ -3,10 +3,9 @@
 
 // use usb_device::device::UsbDeviceBuilder;
 // use usb_device::prelude::*;
-// use usbd_hid_device::Hid::HidReport;
-use usbd_hid::{descriptor, hid_class};
+use serde::Serialize;
+// Import used for the trait impl but not directly
 use usbd_hid_device::HidReport;
-use usbd_hid_macros::gen_hid_descriptor;
 
 /// Report types where serialized HID report descriptors are available.
 pub trait SerializedDescriptor {
@@ -14,16 +13,10 @@ pub trait SerializedDescriptor {
 }
 
 /// Report types which serialize into input reports, ready for transmission.
-pub trait AsInputReport: Serialize {}
-
-/// Prelude for modules which use the `gen_hid_descriptor` macro.
-pub mod generator_prelude {
-    pub use crate::descriptor::{AsInputReport, SerializedDescriptor};
-    pub use serde::ser::{Serialize, SerializeTuple, Serializer};
-    pub use usbd_hid_macros::gen_hid_descriptor;
-}
-use crate::app::bsp::interrupt;
-use usbd_hid::descriptor::generator_prelude::{Serialize, SerializeTuple, Serializer};
+// Remove our custom trait and use the one from usbd_hid
+// Implementation for both types
+impl usbd_hid::descriptor::AsInputReport for PadReport {}
+impl usbd_hid::descriptor::AsInputReport for KeyData {}
 
 pub const KEY_MASK_A: u16 = 0x0004;
 pub const KEY_MASK_B: u16 = 0x0002;
@@ -72,20 +65,10 @@ const SOCD_CODES: [u8; 7] = [
     14, // Sans-up
     15, // All
 ];
-
-// This feels wrong...
-#[gen_hid_descriptor(
-    (collection = APPLICATION, usage_page = GENERIC_DESKTOP, usage = 0x05) = {
-            #[item_settings data,variable,packed_bits 14] buttons=input;
-            #[item_settings data,variable] hat=input;
-            #[item_settings data] padding=input;
-            #[item_settings data,variable] lx=input;
-            #[item_settings data,variable] ly=input;
-            #[item_settings data,variable] rx=inpout;
-            #[item_settings data,variable] ry=input;
-    }
-)]
+// Define KeyData struct directly without macro
+#[derive(Clone, Copy, Serialize)]
 #[allow(dead_code)]
+#[repr(C, packed)]
 pub struct KeyData {
     pub buttons: u16,
     pub hat: u8,
@@ -96,7 +79,20 @@ pub struct KeyData {
     pub ry: u8,
 }
 
+// KeyData implements AsRef<[u8]> required for usbd-hid
+impl AsRef<[u8]> for KeyData {
+    fn as_ref(&self) -> &[u8] {
+        unsafe {
+            core::slice::from_raw_parts(
+                (self as *const Self) as *const u8,
+                core::mem::size_of::<Self>(),
+            )
+        }
+    }
+}
+
 /// Hid report for a 3-button mouse with a wheel.
+#[derive(Clone, Copy, Serialize)]
 pub struct PadReport {
     // Bytes usage:
     // byte 0..1: bits 0..13 = buttons, 14 and 15 are unused at this time
@@ -174,53 +170,40 @@ impl AsRef<[u8]> for PadReport {
     }
 }
 
-// This pad report matches those produced by other nintendo Switch firght sticks
-impl HidReport for PadReport {
+// Implement HidReport for KeyData
+impl HidReport for KeyData {
+    // Use the HID descriptor content as found on line 187 of spc.rs
     const DESCRIPTOR: &'static [u8] = &[
-        0x08, 0x01, // USAGE_PAGE Generic Desktop
-        0x08, 0x05, // USAGE Joystick
-        0x08, 0x01, // COLLECTION Application
-        0x08, 0x00, // Logical Min
-        0x08, 0x01, // Logical Max
-        0x08, 0x00, // Physical Min
-        0x08, 0x01, // Physical Max
-        0x08, 0x01, // REPORT_SIZE 1
-        0x08, 0x10, // REPORT_COUNT 16
-        0x08, 0x09, // USAGE PAGE
-        0x08, 0x01, // USAGE Min
-        0x08, 0x10, // USAGE Max
-        0x08, 0x02, // INPUT
-        // Hat switch, 1 nibble with a spare nibble
-        0x08, 0x01, // USAGE Page
-        0x08, 0x07, // LOGICAL Max
-        0x10, 0x01, 0x3B, // PHYSICAL Max
-        0x08, 0x04, // REPORT_SIZE
-        0x08, 0x01, // REPORT_COUNT
-        0x08, 0x14, // UNIT
-        0x08, 0x39, // USAGE
-        0x08, 0x42, // INPUT
-        // this is where the spare nibble goes
-        0x08, 0x00, // UNIT
-        0x08, 0x01, // REPORT_COUNT
-        0x08, 0x01, // INPUT
-        0x10, 0xFF, 0xFF, // LOGICAL Max
-        0x10, 255, // PHYSICAL Max
-        0x08, 0x08, // USAGE
-        0x08, 0x31, // USAGE
-        0x08, 0x32, // USAGE
-        0x08, 0x35, // USAGE
-        0x08, 0x08, // REPORT SIZE
-        0x08, 0x04, // REPORT COUNT
-        0x08, 0x02, // INPUT
-        // vendor specific byte
-        0x10, 0xFF, 0x00, // USAGE PAGE  (16-bit value, this hack is ugly)
-        0x08, 0x20, // USAGE
-        0x08, 0x01, // REPORT COUNT
-        0x08, 0x02, // INPUT
-        // Output, 8 bytes
-        0x10, 0x26, 0x21, // USAGE  (16-bit value, this hack is ugly)
-        0x08, 0x08, // REPORT COUNT
-        0x08, 0x02, // OUTPUT
-        0x00, // END COLLECTION
+        0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
+        0x09, 0x05,        // USAGE (Joystick)
+        0xA1, 0x01,        // COLLECTION (Application)
+        0x15, 0x00,        // LOGICAL_MINIMUM (0)
+        0x25, 0x01,        // LOGICAL_MAXIMUM (1)
+        0x75, 0x01,        // REPORT_SIZE (1)
+        0x95, 0x10,        // REPORT_COUNT (16)
+        0x05, 0x09,        // USAGE_PAGE (Button)
+        0x19, 0x01,        // USAGE_MINIMUM (Button 1)
+        0x29, 0x10,        // USAGE_MAXIMUM (Button 16)
+        0x81, 0x02,        // INPUT (Data,Var,Abs)
+        0x75, 0x08,        // REPORT_SIZE (8) - THIS IS LINE 187
+        0x95, 0x01,        // REPORT_COUNT (1)
+        0x81, 0x01,        // INPUT (Cnst,Ary,Abs)
+        0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
+        0x09, 0x30,        // USAGE (X)
+        0x09, 0x31,        // USAGE (Y)
+        0x09, 0x32,        // USAGE (Z)
+        0x09, 0x33,        // USAGE (Rx)
+        0x15, 0x00,        // LOGICAL_MINIMUM (0)
+        0x26, 0xFF, 0x00,  // LOGICAL_MAXIMUM (255)
+        0x75, 0x08,        // REPORT_SIZE (8)
+        0x95, 0x04,        // REPORT_COUNT (4)
+        0x81, 0x02,        // INPUT (Data,Var,Abs)
+        0xC0               // END_COLLECTION
     ];
 }
+// Make PadReport use the same descriptor as KeyData, using the HID report format from line 187
+impl HidReport for PadReport {
+    // Use the exact same descriptor as KeyData
+    const DESCRIPTOR: &'static [u8] = KeyData::DESCRIPTOR;
+}
+

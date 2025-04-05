@@ -5,30 +5,25 @@
 
 #![no_std]
 #![no_main]
-#![feature(generic_arg_infer)]
 
 use teensy4_panic as _;
 mod spc;
 
-#[rtic::app(device = board, peripherals = false)]
+#[rtic::app(device = teensy4_bsp, peripherals = true)]
 mod app {
     use hal::usbd::{BusAdapter, EndpointMemory, EndpointState, Speed};
     use imxrt_hal as hal;
+    use usbd_hid_device::HidReport;  // Import HidReport trait
 
     use usb_device::{
         bus::UsbBusAllocator,
         device::{UsbDevice, UsbDeviceBuilder, UsbDeviceState, UsbVidPid},
     };
-    use usbd_hid::{
-        descriptor::{KeyboardReport, SerializedDescriptor as _},
-        hid_class::HIDClass,
-    };
-    use teensy4_bsp::{self as bsp};
-    use board::t40 as my_board;
-    use bsp::board;
+    use usbd_hid::hid_class::HIDClass;
+    use teensy4_bsp as bsp;
     use bsp::{
+        // hal::{gpio, iomuxc},
         hal::{gpio, iomuxc},
-        hal::{gpio, iomuxc, usbd},
         // hal::{adc, gpio, iomuxc, usbd},
         pins,
     };
@@ -42,7 +37,7 @@ mod app {
     const PRODUCT: &str = "mumen";
     /// How frequently should we poll the logger?
     /// // @TODO, what is the resolution here? This is the default value given to us by the example.
-    const LPUART_POLL_INTERVAL_MS: u32 = board::PIT_FREQUENCY / 1_000 * 100;
+    const LPUART_POLL_INTERVAL_MS: u32 = 100; // Use a fixed value of 100ms
     /// Change me to change how log messages are serialized.
     ///
     /// If changing to `Defmt`, you'll need to update the logging macros in
@@ -67,7 +62,7 @@ mod app {
     // use adc::AnalogInput;
     use embedded_hal::digital::InputPin;
 
-    use crate::spc;
+    use crate::spc::{self, PadReport, KeyData};
     // use teensy4_bsp::hal::iomuxc::adc::Pin as AdcPin;
     const PIN_CONFIG: iomuxc::Config =
     iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
@@ -113,21 +108,28 @@ mod app {
 
     #[init(local = [bus: Option<UsbBusAllocator<Bus>> = None])]
     fn init(ctx: init::Context) -> (Shared, Local) {
-        let (
-            board::Common {
-                pit: (mut timer, _, _, _),
-                usb1,
-                usbnc1,
-                usbphy1,
-                mut dma,
-                mut gpio1,
-                mut gpio2,
-                mut gpio4,
-                mut pins,
-                ..
-            },
-            board::Specifics { led, console, .. },
-        ) = board::new();
+        // Initialize the board
+        // Get the hardware peripherals
+        let peripherals = ctx.device;
+        
+        // Initialize the board
+        let board = bsp::board::t40(peripherals);
+        
+        // Get pins and components
+        // Extract components from the Resources struct
+        let mut pins = board.pins;
+        let mut timer = board.pit.0;
+        let mut gpio1 = board.gpio1;
+        let mut gpio2 = board.gpio2;
+        let mut gpio4 = board.gpio4;
+        
+        // Configure timer
+        timer.set_load_timer_value(LPUART_POLL_INTERVAL_MS);
+        timer.set_interrupt_enable(true);
+        timer.enable();
+        
+        // Use the USB directly
+        let usbd = board.usb;
         // configure GPIO for the buttons
         iomuxc::configure(&mut pins.p0, PIN_CONFIG);
         iomuxc::configure(&mut pins.p1, PIN_CONFIG);
@@ -183,80 +185,49 @@ mod app {
         timer.set_interrupt_enable(true);
         timer.enable();
 
-        // let dma_a = dma[board::BOARD_DMA_A_INDEX].take().unwrap();
-        // let poller = board::logging::lpuart(FRONTEND, console, dma_a);
+        // No need to create new usbd instances as we already initialized it above
 
-        let usbd = hal::usbd::Instances {
-            usb: usb1,
-            usbnc: usbnc1,
-            usbphy: usbphy1,
-        };
-
-        let bus = BusAdapter::with_speed(usbd, &EP_MEMORY, &EP_STATE, SPEED);
+        let bus = BusAdapter::new(usbd, &EP_MEMORY, &EP_STATE);
         bus.set_interrupts(true);
-        // bus.gpt_mut(GPT_INSTANCE, |gpt| {
-        //     gpt.stop();
-        //     gpt.clear_elapsed();
-        //     gpt.set_interrupt_enabled(true);
-        //     gpt.set_mode(imxrt_usbd::gpt::Mode::Repeat);
-        //     gpt.set_load(MOUSE_UPDATE_INTERVAL_MS * 1000);
-        //     gpt.reset();
-        //     gpt.run();
-        // });
 
         let bus = ctx.local.bus.insert(UsbBusAllocator::new(bus));
         // Note that "4" correlates to a 1ms polling interval. Since this is a high speed
         // device, bInterval is computed differently.
-        let class = HIDClass::new(bus, KeyboardReport::desc(), 4);
-        // @here, configure the usb-hid to use the one in usb.rs
-        //  the line above these comments likely neeeds to point at the types
-        //    which we define in usb.rs...
+        // Use the KeyData descriptor from spc.rs which contains the correct format at line 187 (REPORT_SIZE (8))
+        let hid = HIDClass::new(bus, spc::KeyData::DESCRIPTOR, 4);
+        
+        // Configure the USB device with standard descriptors
         let device = UsbDeviceBuilder::new(bus, VID_PID)
-            .strings(&[usb_device::device::StringDescriptors::default().product(PRODUCT)])
-            .unwrap()
-            .device_class(usbd_hid::hid_class)
+            .manufacturer("Mumen Industries")
+            .product("Mumen Controller")
+            .serial_number("12345")
             .max_packet_size_0(64)
-            .unwrap()
             .build();
 
-        (
-            Shared { keys },
-            Local {
-                hid,
-                keydata,
-                pin_a,
-                pin_b,
-                pin_x,
-                pin_y,
-                pin_l1,
-                pin_r1,
-                pin_l2,
-                pin_r2,
-                pin_l3,
-                pin_r3,
-                pin_select,
-                pin_start,
-                pin_home,
-                pin_up,
-                pin_down,
-                pin_left,
-                pin_right,
-                pin_t_analog_left,
-                pin_t_analog_right,
-                pin_lock,
-                class,
-                device,
-                // led,
-                // poller,
-                // timer,
-                // message: MESSAGE.iter().cycle(),
-            },
-        );
+        // Initialize KeyData with default values
+        let mut keydata = spc::KeyData {
+            buttons: 0,
+            hat: 0,
+            padding: 0,
+            lx: 128,  // Neutral position
+            ly: 128,  // Neutral position
+            rx: 128,  // Neutral position
+            ry: 128,  // Neutral position
+        };
+        
+        // Create a new PadReport from the KeyData
+        let mut keys = spc::PadReport::new(&keydata);
+        
+        // Clear the keys initially
+        keys.clear_keys();
+        
         check_input::spawn().unwrap();
         (
             Shared { keys },
             Local {
                 hid,
+                device,
+                timer,
                 keydata,
                 pin_a,
                 pin_b,
@@ -295,8 +266,8 @@ mod app {
     //     ctx.local.poller.poll();
     // }
 
-    #[task(binds = BOARD_USB1, local = [device, hid, configured: bool = false], priority = 2)]
-    fn usb1(ctx: usb1::Context) {
+    #[task(binds = USB_OTG1, shared = [keys], local = [device, hid, configured: bool = false], priority = 2)]
+    fn usb1(mut ctx: usb1::Context) {
         let usb1::LocalResources {
             hid,
             device,
@@ -306,7 +277,7 @@ mod app {
             ..
         } = ctx.local;
 
-        device.poll(&mut [class]);
+        device.poll(&mut [hid]);
 
         if device.state() == UsbDeviceState::Configured {
             if !*configured {
@@ -328,11 +299,13 @@ mod app {
 
             // if elapsed {
                 // led.toggle();
-                // let code = *message.next().unwrap();
-                // if let Some(report) = translate_char(code) {
-                    class.push_input(&report).ok();
-                // }
-                // @TODO this is where we pushed a char after 
+                // Access the shared keys value and push to HID
+                // Access shared keys and push them directly to HID
+                ctx.shared.keys.lock(|keys| {
+                    // Push the keys data directly to HID
+                    hid.push_input(keys).ok();
+                });
+                // @TODO this is where we pushed a char after
                 //  the wait was done in the weird eldritch keybaord example...
             // }
         }
@@ -366,18 +339,9 @@ mod app {
         // pin_ly 
         ])] 
     async fn check_input(mut cx: check_input::Context) {
-        let mut dpad: u8 = 0;
+        let mut dpad: u8;
         loop {
             dpad = 0;
-            //     if cx.local.pin_t_analog_left.is_low().unwrap() {
-            //         // Do some stuff with the analog stick
-            //         pass
-            //     } else if cx.local.pin_t_analog_right.is_high().unwrap() {
-            //         // cx.shared.keydata.lx = 255;
-            //         // Do some stuff with the analog stick
-            //         pass
-            //     }
-            // cx.shared.keys.clear_keys(&self);
             // Access keys through cx.shared
             cx.shared.keys.lock(|keys| {
                 keys.clear_keys();
@@ -423,7 +387,10 @@ mod app {
                     if cx.local.pin_home.is_low().unwrap() {
                         cx.local.keydata.buttons |= spc::KEY_MASK_HOME;
                     }
-                    // If we add a capture pin, it would go here... 
+                    // If we add a capture pin, uncomment this
+                    // if cx.local.poin_cap.is_low().unwrap() {
+                        // cx.local.keydata.buttons |= spc::KEY_MASK_CAP;
+                    // }
                 }
                 // Digital processing of analog sticks
                 // AnalogStick toggle set to left stick
@@ -480,26 +447,31 @@ mod app {
                 // AS toggle not set, process D-Pad
                 } else {
                     // Check up and down, clean SOCD
+                    if cx.local.pin_up.is_low().unwrap() {
+                        dpad |= spc::HAT_MASK_UP;
+                    }
                     if cx.local.pin_down.is_low().unwrap() {
-                        if cx.local.pin_up.is_low().unwrap() {
-                            dpad |= spc::HAT_MASK_UP;
-                        }
-                        else {
-                            dpad |= spc::HAT_MASK_DOWN;
-                        }
-                    }
-                    else if cx.local.pin_down.is_low().unwrap() {
                         dpad |= spc::HAT_MASK_DOWN;
-                            
                     }
-                    // NOW LEFT AND RIGHT, still cleaning
+                    // Check left and right
                     if cx.local.pin_left.is_low().unwrap() {
                         dpad |= spc::HAT_MASK_LEFT;
                     }
-                    else if cx.local.pin_right.is_low().unwrap() {
+                    if cx.local.pin_right.is_low().unwrap() {
                         dpad |= spc::HAT_MASK_RIGHT;
                     }
+                    
+                    // Update the PadReport with the current KeyData values
+                    let updated_keys = spc::PadReport::new(&cx.local.keydata);
+                    
+                    // Copy the updated values to the shared keys object
+                    *keys = updated_keys;
+                    
+                    // Set the hat switch
                     keys.set_hat(dpad);
+                    
+                    // Reset the buttons for the next update
+                    cx.local.keydata.buttons = 0;
                 }
             });
         }

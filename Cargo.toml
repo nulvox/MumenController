@@ -9,12 +9,14 @@ rtic-monotonics = { version = "1", default-features = false, features = [
     "cortex-m-systick",
 ] }
 
-imxrt-usbd = { version = "^0.1" }
-imxrt-hal = "^0.5"
-usb-device = "^0.2"
-usbd-hid = "^0.8"
-usbd-hid-device = "^0.1"
-embedded-hal = "^1.0"
+# Force specific versions to avoid conflicts
+imxrt-usbd = { version = "0.2.2" }
+imxrt-hal = "0.5.0"
+usb-device = { version = "0.2.9", features = ["control-buffer-256"] }
+usbd-hid = { version = "0.6.1" }
+usbd-hid-device = "0.1.1"
+embedded-hal = "1.0.0"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
 
 # Remove these if you don't want logging.
 # imxrt-log = { version = "0.1", default-features = false, features = [
@@ -36,8 +38,7 @@ features = [
     "rt",
 ]
 
-[dependencies.usbd-hid-macros]
-version = "0.8.2"
+# Remove separate usbd-hid-macros dependency to avoid conflicts
 
 # Don't optimize build dependencies, like proc macros.
 # Helps with build times.
