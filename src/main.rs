@@ -205,7 +205,7 @@ mod app {
             .build();
 
         // Initialize KeyData with default values
-        let mut keydata = spc::KeyData {
+        let keydata = spc::KeyData {
             buttons: 0,
             hat: 0,
             padding: 0,

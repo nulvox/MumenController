@@ -12,6 +12,8 @@ install [rustup ](https://rustup.rs/)
 
 `cargo objcopy --release -- -O ihex mumen.hex`
 
+`teensy_loader_cli --mcu=IMXRT1062 -w mumen.hex`
+
 # Old Setup (atmega32u4)
 
 ## windows
