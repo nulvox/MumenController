@@ -8,6 +8,7 @@
 
 use teensy4_panic as _;
 mod spc;
+mod pinouts;
 
 #[rtic::app(device = teensy4_bsp, peripherals = true)]
 mod app {
@@ -39,7 +40,7 @@ mod app {
     const PRODUCT: &str = "mumen";
     /// How frequently should we poll the logger?
     /// // @TODO, what is the resolution here? This is the default value given to us by the example.
-    const LPUART_POLL_INTERVAL_MS: u32 = 100; // Use a fixed value of 100ms
+    const LPUART_POLL_INTERVAL_MS: u32 = 200; // Increased from 100ms to 200ms to reduce power consumption
     /// Change me to change how log messages are serialized.
     ///
     /// If changing to `Defmt`, you'll need to update the logging macros in
@@ -65,9 +66,11 @@ mod app {
     use embedded_hal::digital::InputPin;
 
     use crate::spc::{self, PadReport, KeyData};
+    use crate::pinouts::{PinoutConfig, PinType, PinConfig, is_pin_low, is_pin_high};
     // use teensy4_bsp::hal::iomuxc::adc::Pin as AdcPin;
+    // Use 22k pull-up resistors for better power efficiency
     const PIN_CONFIG: iomuxc::Config =
-    iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pullup100k));
+    iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pullup22k));
     #[local]
     struct Local {
         hid: HIDClass<'static, Bus>,
@@ -76,30 +79,8 @@ mod app {
         timer: hal::pit::Pit<0>,
         // message: MessageIter,
         keydata: KeyData,
-        pin_a: gpio::Input<pins::t40::P14>,
-        pin_b: gpio::Input<pins::t40::P11>,
-        pin_x: gpio::Input<pins::t40::P9>,
-        pin_y: gpio::Input<pins::t40::P16>,
-        pin_l1: gpio::Input<pins::t40::P15>,
-        pin_r1: gpio::Input<pins::t40::P10>,
-        pin_l2: gpio::Input<pins::t40::P12>,
-        pin_r2: gpio::Input<pins::t40::P13>,
-        pin_l3: gpio::Input<pins::t40::P3>,
-        pin_r3: gpio::Input<pins::t40::P2>,
-        pin_select: gpio::Input<pins::t40::P18>,
-        pin_start: gpio::Input<pins::t40::P17>,
-        pin_home: gpio::Input<pins::t40::P8>,
-        pin_up: gpio::Input<pins::t40::P1>,
-        pin_down: gpio::Input<pins::t40::P6>,
-        pin_left: gpio::Input<pins::t40::P7>,
-        pin_right: gpio::Input<pins::t40::P19>,
-        pin_t_analog_left: gpio::Input<pins::t40::P4>,
-        pin_t_analog_right: gpio::Input<pins::t40::P5>,
-        pin_lock: gpio::Input<pins::t40::P0>,
-        // pin_rx: adc::AnalogInput<pins::t40::P22, 9>,
-        // pin_ry: adc::AnalogInput<pins::t40::P23, 10>,
-        // pin_lx: adc::AnalogInput<pins::t40::P20, 7>,
-        // pin_ly: adc::AnalogInput<pins::t40::P21, 8>,
+        pins: PinConfig,
+        pinout: Box<dyn PinoutConfig>,
     }
 
     #[shared]
@@ -131,67 +112,14 @@ mod app {
         timer.set_interrupt_enable(true);
         timer.enable();
         
+        // Create pinout configuration based on selected feature
+        let pinout: Box<dyn PinoutConfig> = Box::new(pinouts::create_pinout());
+        
         // Use the USB directly
         let usbd = board.usb;
-        // Configure GPIO for the buttons using proper pull-up resistors
-        // For digital input pins, use 100k pull-up
-        let digital_config = iomuxc::Config::zero()
-            .set_pull_keeper(Some(iomuxc::PullKeeper::Pullup100k));
-            
-        // Lock pin uses pull-down as it needs to be high when active
-        let lock_config = iomuxc::Config::zero()
-            .set_pull_keeper(Some(iomuxc::PullKeeper::Pulldown100k));
-            
-        // Apply the configurations to each pin
-        iomuxc::configure(&mut pins.p0, lock_config);
-        iomuxc::configure(&mut pins.p1, digital_config);
-        iomuxc::configure(&mut pins.p2, digital_config);
-        iomuxc::configure(&mut pins.p3, digital_config);
-        iomuxc::configure(&mut pins.p4, digital_config);
-        iomuxc::configure(&mut pins.p5, digital_config);
-        iomuxc::configure(&mut pins.p6, digital_config);
-        iomuxc::configure(&mut pins.p7, digital_config);
-        iomuxc::configure(&mut pins.p8, digital_config);
-        iomuxc::configure(&mut pins.p9, digital_config);
-        iomuxc::configure(&mut pins.p10, digital_config);
-        iomuxc::configure(&mut pins.p11, digital_config);
-        iomuxc::configure(&mut pins.p12, digital_config);
-        iomuxc::configure(&mut pins.p13, digital_config);
-        iomuxc::configure(&mut pins.p14, digital_config);
-        iomuxc::configure(&mut pins.p15, digital_config);
-        iomuxc::configure(&mut pins.p16, digital_config);
-        iomuxc::configure(&mut pins.p17, digital_config);
-        iomuxc::configure(&mut pins.p18, digital_config);
-        iomuxc::configure(&mut pins.p19, digital_config);
-        // iomuxc::configure(&mut pins.p20, ANALOG_PIN_CONFIG);
-        // iomuxc::configure(&mut pins.p21, ANALOG_PIN_CONFIG);
-        // iomuxc::configure(&mut pins.p22, ANALOG_PIN_CONFIG);
-        // iomuxc::configure(&mut pins.p23, ANALOG_PIN_CONFIG);
-
-        let pin_a = gpio1.input(pins.p14);
-        let pin_b = gpio2.input(pins.p11);
-        let pin_x = gpio2.input(pins.p9);
-        let pin_y = gpio1.input(pins.p16);
-        let pin_l1 = gpio1.input(pins.p15);
-        let pin_r1 = gpio2.input(pins.p10);
-        let pin_l2 = gpio2.input(pins.p12);
-        let pin_r2 = gpio2.input(pins.p13);
-        let pin_l3 = gpio4.input(pins.p3);
-        let pin_r3 = gpio4.input(pins.p2);
-        let pin_select = gpio1.input(pins.p18);
-        let pin_start = gpio1.input(pins.p17);
-        let pin_home = gpio2.input(pins.p8);
-        let pin_up = gpio1.input(pins.p1);
-        let pin_down = gpio2.input(pins.p6);
-        let pin_left = gpio2.input(pins.p7);
-        let pin_right = gpio1.input(pins.p19);
-        let pin_t_analog_left = gpio4.input(pins.p4);
-        let pin_t_analog_right = gpio4.input(pins.p5);
-        let pin_lock = gpio1.input(pins.p0);
-        // let pin_rx: adc::AnalogInput<pins::t40::P22, 9> = adc::AnalogInput::new(pins.p22);
-        // let pin_ry: adc::AnalogInput<pins::t40::P23, 10> = adc::AnalogInput::new(pins.p23);
-        // let pin_lx: adc::AnalogInput<pins::t40::P20, 7> = adc::AnalogInput::new(pins.p20);
-        // let pin_ly: adc::AnalogInput<pins::t40::P21, 8> = adc::AnalogInput::new(pins.p21);
+        
+        // Configure pins using the pinout configuration
+        let pins_config = pinout.configure_pins(&mut pins, &mut gpio1, &mut gpio2, &mut gpio4);
 
         timer.set_load_timer_value(LPUART_POLL_INTERVAL_MS);
         timer.set_interrupt_enable(true);
@@ -207,7 +135,8 @@ mod app {
         let bus = ctx.local.bus.insert(UsbBusAllocator::new(bus));
         // Use a more conservative polling interval to reduce power consumption
         // The dim power light suggests we might be drawing too much power
-        let polling_interval = 10; // 10ms polling for better power efficiency
+        // Increase polling interval to further reduce power consumption
+        let polling_interval = 20; // Changed from 10ms to 20ms for better power efficiency
         
         // Use the KeyData descriptor from spc.rs
         let hid = HIDClass::new(bus, spc::KeyData::DESCRIPTOR, polling_interval);
@@ -219,17 +148,16 @@ mod app {
             .serial_number("12345")
             .max_packet_size_0(64)
             .build();
-
-        // Initialize KeyData with default values
-        let keydata = spc::KeyData {
-            buttons: 0,
-            hat: 0,
-            padding: 0,
-            lx: 128,  // Neutral position
-            ly: 128,  // Neutral position
-            rx: 128,  // Neutral position
-            ry: 128,  // Neutral position
-        };
+// Initialize KeyData with default values and neutral positions for analog sticks
+let keydata = spc::KeyData {
+    buttons: 0,
+    hat: 0,
+    padding: 0,
+    lx: pinout.get_neutral_value(PinType::Lx),
+    ly: pinout.get_neutral_value(PinType::Ly),
+    rx: pinout.get_neutral_value(PinType::Rx),
+    ry: pinout.get_neutral_value(PinType::Ry),
+};
         
         // Create a new PadReport from the KeyData
         let mut keys = spc::PadReport::new(&keydata);
@@ -245,30 +173,8 @@ mod app {
                 device,
                 timer,
                 keydata,
-                pin_a,
-                pin_b,
-                pin_x,
-                pin_y,
-                pin_l1,
-                pin_r1,
-                pin_l2,
-                pin_r2,
-                pin_l3,
-                pin_r3,
-                pin_select,
-                pin_start,
-                pin_home,
-                pin_up,
-                pin_down,
-                pin_left,
-                pin_right,
-                pin_t_analog_left,
-                pin_t_analog_right,
-                pin_lock,
-                // pin_rx,
-                // pin_ry,
-                // pin_lx,
-                // pin_ly,
+                pins: pins_config,
+                pinout,
             },
         )
     }
@@ -331,32 +237,10 @@ mod app {
         }
     }
 
-    #[task(shared = [ keys ], local = [ 
-        keydata, 
-        pin_a, 
-        pin_b, 
-        pin_x, 
-        pin_y, 
-        pin_l1, 
-        pin_r1, 
-        pin_l2, 
-        pin_r2, 
-        pin_l3, 
-        pin_r3, 
-        pin_select, 
-        pin_start, 
-        pin_home, 
-        pin_up, 
-        pin_down, 
-        pin_left, 
-        pin_right, 
-        pin_t_analog_left, 
-        pin_t_analog_right, 
-        pin_lock, 
-        // pin_rx, 
-        // pin_ry, 
-        // pin_lx, 
-        // pin_ly 
+    #[task(shared = [ keys ], local = [
+        keydata,
+        pins,
+        pinout,
         ])] 
     async fn check_input(mut cx: check_input::Context) {
         let mut dpad: u8;
@@ -364,11 +248,19 @@ mod app {
         // Debug info - initial state check
         let mut initial_state = 0u16;
         
-        // Test each pin at startup
-        if cx.local.pin_a.is_low().unwrap() { initial_state |= 0x0001; }
-        if cx.local.pin_b.is_low().unwrap() { initial_state |= 0x0002; }
-        if cx.local.pin_x.is_low().unwrap() { initial_state |= 0x0004; }
-        if cx.local.pin_y.is_low().unwrap() { initial_state |= 0x0008; }
+        // Test each pin at startup, only checking configured pins
+        if is_pin_low(&cx.local.pins.pin_a) && cx.local.pinout.is_configured(PinType::A) {
+            initial_state |= 0x0001;
+        }
+        if is_pin_low(&cx.local.pins.pin_b) && cx.local.pinout.is_configured(PinType::B) {
+            initial_state |= 0x0002;
+        }
+        if is_pin_low(&cx.local.pins.pin_x) && cx.local.pinout.is_configured(PinType::X) {
+            initial_state |= 0x0004;
+        }
+        if is_pin_low(&cx.local.pins.pin_y) && cx.local.pinout.is_configured(PinType::Y) {
+            initial_state |= 0x0008;
+        }
         // Set initial buttons state to show connected
         cx.local.keydata.buttons = initial_state;
         
@@ -380,144 +272,156 @@ mod app {
                 // Reset buttons for this iteration
                 cx.local.keydata.buttons = 0;
                 
-                // Check each pin with minimal error handling to avoid issues
-                let a_pressed = cx.local.pin_a.is_low().unwrap_or(false);
-                let b_pressed = cx.local.pin_b.is_low().unwrap_or(false);
+                // Check buttons based on configuration
                 
-                // Set button state
-                if a_pressed {
+                // A and B buttons
+                if cx.local.pinout.is_configured(PinType::A) && is_pin_low(&cx.local.pins.pin_a) {
                     cx.local.keydata.buttons |= spc::KEY_MASK_A;
                 }
-                if b_pressed {
+                if cx.local.pinout.is_configured(PinType::B) && is_pin_low(&cx.local.pins.pin_b) {
                     cx.local.keydata.buttons |= spc::KEY_MASK_B;
                 }
-                // Continue with more robust checking for remaining buttons
-                let x_pressed = cx.local.pin_x.is_low().unwrap_or(false);
-                let y_pressed = cx.local.pin_y.is_low().unwrap_or(false);
-                let l1_pressed = cx.local.pin_l1.is_low().unwrap_or(false);
-                let r1_pressed = cx.local.pin_r1.is_low().unwrap_or(false);
-                let l2_pressed = cx.local.pin_l2.is_low().unwrap_or(false);
-                let r2_pressed = cx.local.pin_r2.is_low().unwrap_or(false);
-                let l3_pressed = cx.local.pin_l3.is_low().unwrap_or(false);
-                let r3_pressed = cx.local.pin_r3.is_low().unwrap_or(false);
-                let lock_active = cx.local.pin_lock.is_high().unwrap_or(false);
                 
-                // Set button state for regular buttons
-                if x_pressed {
+                // X and Y buttons
+                if cx.local.pinout.is_configured(PinType::X) && is_pin_low(&cx.local.pins.pin_x) {
                     cx.local.keydata.buttons |= spc::KEY_MASK_X;
                 }
-                if y_pressed {
+                if cx.local.pinout.is_configured(PinType::Y) && is_pin_low(&cx.local.pins.pin_y) {
                     cx.local.keydata.buttons |= spc::KEY_MASK_Y;
                 }
-                if l1_pressed {
+                
+                // Shoulder buttons
+                if cx.local.pinout.is_configured(PinType::L1) && is_pin_low(&cx.local.pins.pin_l1) {
                     cx.local.keydata.buttons |= spc::KEY_MASK_L1;
                 }
-                if r1_pressed {
+                if cx.local.pinout.is_configured(PinType::R1) && is_pin_low(&cx.local.pins.pin_r1) {
                     cx.local.keydata.buttons |= spc::KEY_MASK_R1;
                 }
-                if l2_pressed {
+                
+                // Trigger buttons (L2, R2) - only if configured
+                if cx.local.pinout.is_configured(PinType::L2) && is_pin_low(&cx.local.pins.pin_l2) {
                     cx.local.keydata.buttons |= spc::KEY_MASK_L2;
                 }
-                if r2_pressed {
+                if cx.local.pinout.is_configured(PinType::R2) && is_pin_low(&cx.local.pins.pin_r2) {
                     cx.local.keydata.buttons |= spc::KEY_MASK_R2;
                 }
-                if l3_pressed {
+                
+                // Thumbstick buttons (L3, R3) - only if configured
+                if cx.local.pinout.is_configured(PinType::L3) && is_pin_low(&cx.local.pins.pin_l3) {
                     cx.local.keydata.buttons |= spc::KEY_MASK_L3;
                 }
-                if r3_pressed {
+                if cx.local.pinout.is_configured(PinType::R3) && is_pin_low(&cx.local.pins.pin_r3) {
                     cx.local.keydata.buttons |= spc::KEY_MASK_R3;
                 }
                 
-                // Handle lock-dependent buttons
+                // Lock only if configured
+                let lock_active = cx.local.pinout.is_configured(PinType::Lock) &&
+                                  is_pin_high(&cx.local.pins.pin_lock);
+                
+                
+                // Handle lock-dependent buttons (Select, Start, Home) - only if lock is active
                 if lock_active {
-                    let select_pressed = cx.local.pin_select.is_low().unwrap_or(false);
-                    let start_pressed = cx.local.pin_start.is_low().unwrap_or(false);
-                    let home_pressed = cx.local.pin_home.is_low().unwrap_or(false);
-                    
-                    if select_pressed {
+                    if cx.local.pinout.is_configured(PinType::Select) && is_pin_low(&cx.local.pins.pin_select) {
                         cx.local.keydata.buttons |= spc::KEY_MASK_SELECT;
                     }
-                    if start_pressed {
+                    if cx.local.pinout.is_configured(PinType::Start) && is_pin_low(&cx.local.pins.pin_start) {
                         cx.local.keydata.buttons |= spc::KEY_MASK_START;
                     }
-                    if home_pressed {
+                    if cx.local.pinout.is_configured(PinType::Home) && is_pin_low(&cx.local.pins.pin_home) {
                         cx.local.keydata.buttons |= spc::KEY_MASK_HOME;
                     }
-                    // If we add a capture pin, uncomment this
-                    // if cx.local.poin_cap.is_low().unwrap() {
-                        // cx.local.keydata.buttons |= spc::KEY_MASK_CAP;
-                    // }
                 }
-                // Digital processing of analog sticks with robust error handling
-                // Get all directional inputs with safe unwrapping
-                let t_analog_left = cx.local.pin_t_analog_left.is_low().unwrap_or(false);
-                let t_analog_right = cx.local.pin_t_analog_right.is_low().unwrap_or(false);
-                let up_pressed = cx.local.pin_up.is_low().unwrap_or(false);
-                let down_pressed = cx.local.pin_down.is_low().unwrap_or(false);
-                let left_pressed = cx.local.pin_left.is_low().unwrap_or(false);
-                let right_pressed = cx.local.pin_right.is_low().unwrap_or(false);
+                // Get directional inputs
+                let t_analog_left = cx.local.pinout.is_configured(PinType::AnalogLeft) &&
+                                    is_pin_low(&cx.local.pins.pin_t_analog_left);
+                let t_analog_right = cx.local.pinout.is_configured(PinType::AnalogRight) &&
+                                     is_pin_low(&cx.local.pins.pin_t_analog_right);
+                let up_pressed = cx.local.pinout.is_configured(PinType::Up) &&
+                                 is_pin_low(&cx.local.pins.pin_up);
+                let down_pressed = cx.local.pinout.is_configured(PinType::Down) &&
+                                   is_pin_low(&cx.local.pins.pin_down);
+                let left_pressed = cx.local.pinout.is_configured(PinType::Left) &&
+                                   is_pin_low(&cx.local.pins.pin_left);
+                let right_pressed = cx.local.pinout.is_configured(PinType::Right) &&
+                                    is_pin_low(&cx.local.pins.pin_right);
                 
                 // AnalogStick toggle set to left stick
-                if t_analog_left {
-                    // Handle Y-axis
-                    if down_pressed {
+                // Set analog stick values based on pinout configuration
+                if cx.local.pinout.is_configured(PinType::Lx) && cx.local.pinout.is_configured(PinType::Ly) {
+                    if t_analog_left {
+                        // Handle Y-axis
                         if up_pressed {
-                            cx.local.keydata.ly = 255;
+                            if down_pressed {
+                                cx.local.keydata.ly = 255;
+                            } else {
+                                cx.local.keydata.ly = 64;
+                            }
+                        } else if down_pressed {
+                            cx.local.keydata.ly = 0;
                         } else {
-                            cx.local.keydata.ly = 64;
+                            // Ensure neutral position if no input
+                            cx.local.keydata.ly = 128;
                         }
-                    } else if down_pressed {
-                        cx.local.keydata.ly = 0;
-                    } else {
-                        // Ensure neutral position if no input
-                        cx.local.keydata.ly = 128;
-                    }
-                    
-                    // Handle X-axis
-                    if left_pressed {
-                        if right_pressed {
-                            cx.local.keydata.lx = 64;
+                        
+                        // Handle X-axis
+                        if left_pressed {
+                            if right_pressed {
+                                cx.local.keydata.lx = 64;
+                            } else {
+                                cx.local.keydata.lx = 0;
+                            }
+                        } else if right_pressed {
+                            cx.local.keydata.lx = 255;
                         } else {
-                            cx.local.keydata.lx = 0;
+                            // Ensure neutral position if no input
+                            cx.local.keydata.lx = 128;
                         }
-                    } else if right_pressed {
-                        cx.local.keydata.lx = 255;
-                    } else {
-                        // Ensure neutral position if no input
-                        cx.local.keydata.lx = 128;
                     }
+                } else {
+                    // Set neutral values for unconfigured analog sticks
+                    cx.local.keydata.lx = cx.local.pinout.get_neutral_value(PinType::Lx);
+                    cx.local.keydata.ly = cx.local.pinout.get_neutral_value(PinType::Ly);
                 }
                 // AnalogStick toggle set to right stick
-                else if t_analog_right {
-                    // Handle Y-axis
-                    if down_pressed {
+                // Set right analog stick values based on pinout configuration
+                if cx.local.pinout.is_configured(PinType::Rx) && cx.local.pinout.is_configured(PinType::Ry) {
+                    if t_analog_right {
+                        // Handle Y-axis
                         if up_pressed {
-                            cx.local.keydata.ry = 255;
+                            if down_pressed {
+                                cx.local.keydata.ry = 255;
+                            } else {
+                                cx.local.keydata.ry = 64;
+                            }
+                        } else if down_pressed {
+                            cx.local.keydata.ry = 0;
                         } else {
-                            cx.local.keydata.ry = 64;
+                            // Ensure neutral position if no input
+                            cx.local.keydata.ry = 128;
                         }
-                    } else if down_pressed {
-                        cx.local.keydata.ry = 0;
-                    } else {
-                        // Ensure neutral position if no input
-                        cx.local.keydata.ry = 128;
-                    }
-                    
-                    // Handle X-axis
-                    if left_pressed {
-                        if right_pressed {
-                            cx.local.keydata.rx = 64;
+                        
+                        // Handle X-axis
+                        if left_pressed {
+                            if right_pressed {
+                                cx.local.keydata.rx = 64;
+                            } else {
+                                cx.local.keydata.rx = 0;
+                            }
+                        } else if right_pressed {
+                            cx.local.keydata.rx = 255;
                         } else {
-                            cx.local.keydata.rx = 0;
+                            // Ensure neutral position if no input
+                            cx.local.keydata.rx = 128;
                         }
-                    } else if right_pressed {
-                        cx.local.keydata.rx = 255;
-                    } else {
-                        // Ensure neutral position if no input
-                        cx.local.keydata.rx = 128;
                     }
-                // AS toggle not set, process D-Pad
                 } else {
+                    // Set neutral values for unconfigured analog sticks
+                    cx.local.keydata.rx = cx.local.pinout.get_neutral_value(PinType::Rx);
+                    cx.local.keydata.ry = cx.local.pinout.get_neutral_value(PinType::Ry);
+                }
+                
+                // If neither analog toggle is active or toggles not configured, process D-Pad
+                if (!t_analog_left && !t_analog_right) {
                     // Check up and down, clean SOCD with safe error handling
                     if up_pressed {
                         dpad |= spc::HAT_MASK_UP;
@@ -584,10 +488,10 @@ mod app {
                 cx.local.keydata.buttons = 0;
             });
             
-            // Use a longer delay to reduce power consumption
-            // The dim power light suggests potential power issues
-            // Let the system rest more between checks
-            for _ in 0..20000 {
+            // Significantly increase the delay to further reduce power consumption
+            // This reduces the polling frequency which is a major factor in power usage
+            // Adjust this value if responsiveness becomes an issue
+            for _ in 0..50000 {
                 core::hint::spin_loop();
             }
         }

@@ -38,6 +38,12 @@ features = [
     "rt",
 ]
 
+[features]
+# Standard pinout is the default (no need to specify a feature for it)
+default = []
+# Alternative pinout with A/B inverted and several pins disabled
+alternate_pinout = []
+
 # Remove separate usbd-hid-macros dependency to avoid conflicts
 
 # Don't optimize build dependencies, like proc macros.
