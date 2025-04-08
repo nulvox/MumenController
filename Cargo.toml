@@ -1,32 +1,52 @@
 [package]
-name = "mumen-controller"
+name = "mumen_controller"
 version = "0.1.0"
-authors = ["nulvox <38874956+nulvox@users.noreply.github.com>"]
 edition = "2021"
-license = "MIT OR Apache-2.0"
-
-[[bin]]
-name = "mumen-controller"
-test = false
-bench = false
 
 [dependencies]
-panic-halt = "0.2.0"
-# ufmt = "0.1.0"
-debouncr = "0.2.2"
-usbd-human-interface-device = { git = "https://github.com/nulvox/usbd-human-interface-device.git", branch = "master" }
-usb-device = "0.2"
-arduino-hal = { git = "https://github.com/rahix/avr-hal", features = ["arduino-leonardo"] }
+rtic = { version = "2", features = ["thumbv7-backend"] }
+rtic-monotonics = { version = "1", default-features = false, features = [
+    "cortex-m-systick",
+] }
 
-# Configure the build for minimal size - AVRs have very little program memory
-[profile.dev]
-panic = "abort"
-lto = false
-opt-level = "s"
+# Force specific versions to avoid conflicts
+imxrt-usbd = { version = "0.2.2" }
+imxrt-hal = "0.5.0"
+usb-device = { version = "0.2.9", features = ["control-buffer-256"] }
+usbd-hid = { version = "0.6.1" }
+usbd-hid-device = "0.1.1"
+embedded-hal = "1.0.0"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
 
-[profile.release]
-panic = "abort"
-codegen-units = 1
-debug = false
-lto = false
-opt-level = "s"
+# Remove these if you don't want logging.
+# imxrt-log = { version = "0.1", default-features = false, features = [
+#     "log",
+#     "usbd",
+# ] }
+# log = { version = "0.4", features = [
+#     "max_level_debug",
+#     "release_max_level_info",
+# ] }
+
+# teensy4-panic = { version = "0.2", features = ["log"] }
+teensy4-panic = "^0.2"
+
+[dependencies.teensy4-bsp]
+version = "^0.5"
+features = [
+    # Use the BSP's runtime.
+    "rt",
+]
+
+[features]
+# Standard pinout is the default (no need to specify a feature for it)
+default = []
+# Alternative pinout with A/B inverted and several pins disabled
+alternate_pinout = []
+
+# Remove separate usbd-hid-macros dependency to avoid conflicts
+
+# Don't optimize build dependencies, like proc macros.
+# Helps with build times.
+[profile.release.build-override]
+opt-level = 0

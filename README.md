@@ -1,11 +1,55 @@
 # MumenController
-This project implements a fight stick firmware to be:
- * fast
- * effective
- * compliant
- * flexible
+This project implements a fight stick firmware to be fast and compliant to evo rules. 
 
-# Setup
+# Setup (i.MX RT/Teensy 4.0)
+install [rustup ](https://rustup.rs/)
+
+`rustup update stable`
+
+`rustup target add thumbv7em-none-eabihf`
+
+`cargo install toml-fmt cargo-generate`
+
+`cargo objcopy --release -- -O ihex mumen.hex`
+
+`teensy_loader_cli --mcu=IMXRT1062 -w mumen.hex`
+
+# Pinout Configurations
+
+The controller now supports multiple pinout configurations that can be selected at build time. This allows for building with different hardware layouts without modifying the code.
+
+## Available Pinout Configurations
+
+### Standard Pinout (Default)
+This is the original pinout configuration with all pins enabled:
+- All buttons (A, B, X, Y, L1, R1, L2, R2, L3, R3, Select, Start, Home)
+- D-pad (Up, Down, Left, Right)
+- Analog toggles (Left, Right)
+- Lock button
+- Analog sticks (Lx, Ly, Rx, Ry)
+
+### Alternate Pinout
+This configuration has the following changes:
+- A and B buttons are inverted
+- L2, R2, L3, and R3 are not configured
+- Shift and Lock buttons are not configured
+- Analog sticks (Lx, Ly, Rx, Ry) are not configured
+
+## Building with Different Pinout Configurations
+
+### Standard Pinout (Default)
+```bash
+cargo objcopy --release -- -O ihex mumen.hex
+```
+
+### Alternate Pinout
+```bash
+cargo objcopy --release --features "alternate_pinout" -- -O ihex mumen_alt.hex
+```
+
+When a pin is not configured in a particular pinout, it will report a neutral value (especially important for analog inputs which report 128 as neutral).
+
+# Old Setup (atmega32u4)
 
 ## windows
 install [VS 2022 build tools](https://visualstudio.microsoft.com/downloads/#other)
