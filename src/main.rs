@@ -70,7 +70,7 @@ mod app {
     // use teensy4_bsp::hal::iomuxc::adc::Pin as AdcPin;
     // Use 22k pull-up resistors for better power efficiency
     const PIN_CONFIG: iomuxc::Config =
-    iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pullup22k));
+    iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pullup100k));
     #[local]
     struct Local {
         hid: HIDClass<'static, Bus>,
@@ -449,7 +449,7 @@ let keydata = spc::KeyData {
                 
                 // Advanced debug mode to test multiple button combinations
                 // This helps identify which buttons the application recognizes
-                let debug_mode = 2; // 0=off, 1=A button, 2=X+Y, 3=all buttons
+                let debug_mode = 0; // 0=off, 1=A button, 2=X+Y, 3=all buttons
                 
                 if debug_mode > 0 {
                     match debug_mode {
@@ -488,12 +488,10 @@ let keydata = spc::KeyData {
                 cx.local.keydata.buttons = 0;
             });
             
-            // Significantly increase the delay to further reduce power consumption
-            // This reduces the polling frequency which is a major factor in power usage
-            // Adjust this value if responsiveness becomes an issue
-            for _ in 0..50000 {
-                core::hint::spin_loop();
-            }
+            // Replace busy-wait spin loop with proper sleep to reduce power consumption
+            // This allows the processor to enter a low-power state between polls
+            // 10ms delay provides good balance between responsiveness and power efficiency
+            rtic_monotonics::systick::fugit::Duration::from_ticks(10).await;
         }
     }
 }

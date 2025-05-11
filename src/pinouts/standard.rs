@@ -30,7 +30,7 @@ impl PinoutConfig for StandardPinout {
     ) -> PinConfig {
         // For digital input pins, use 22k pull-up for power efficiency
         let digital_config = iomuxc::Config::zero()
-            .set_pull_keeper(Some(iomuxc::PullKeeper::Pullup22k));
+            .set_pull_keeper(Some(iomuxc::PullKeeper::Pullup100k));
             
         // Lock pin uses pull-down as it needs to be high when active
         let lock_config = iomuxc::Config::zero()

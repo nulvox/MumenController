@@ -34,7 +34,7 @@ impl PinoutConfig for AlternatePinout {
     ) -> PinConfig {
         // For digital input pins, use 22k pull-up for power efficiency
         let digital_config = iomuxc::Config::zero()
-            .set_pull_keeper(Some(iomuxc::PullKeeper::Pullup22k));
+            .set_pull_keeper(Some(iomuxc::PullKeeper::Pullup100k));
             
         // Configure only the pins we're using
         iomuxc::configure(&mut pins.p1, digital_config);
