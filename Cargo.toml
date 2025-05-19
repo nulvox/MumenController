@@ -1,50 +1,42 @@
 [package]
-name = "mumen_controller"
+name = "mumen-controller"
 version = "0.1.0"
 edition = "2021"
+description = "Nintendo Switch Pro Controller firmware for Teensy 4.0"
+authors = ["Mumen Controller Project"]
 
 [dependencies]
+# Core dependencies
 rtic = { version = "2", features = ["thumbv7-backend"] }
-rtic-monotonics = { version = "1", default-features = false, features = [
-    "cortex-m-systick",
-] }
+rtic-monotonics = { version = "1", default-features = false, features = ["cortex-m-systick"] }
+teensy4-bsp = { version = "0.5", features = ["rt"] }
 
-# Force specific versions to avoid conflicts
-imxrt-usbd = { version = "0.2.2" }
-imxrt-hal = "0.5.0"
-usb-device = { version = "0.2.9", features = ["control-buffer-256"] }
-usbd-hid = { version = "0.6.1" }
-usbd-hid-device = "0.1.1"
-embedded-hal = "1.0.0"
-serde = { version = "1.0", default-features = false, features = ["derive"] }
+# USB HID implementation
+usb-device = "0.2"
+usbd-hid = "0.6"
 
-# Remove these if you don't want logging.
-# imxrt-log = { version = "0.1", default-features = false, features = [
-#     "log",
-#     "usbd",
-# ] }
-# log = { version = "0.4", features = [
-#     "max_level_debug",
-#     "release_max_level_info",
-# ] }
+# Embedded utilities
+embedded-hal = "0.2"
+cortex-m = "0.7"
+cortex-m-rt = "0.7"
 
-# Removed dependency on teensy4-panic as we now use a custom panic handler
-# teensy4-panic = "^0.2"
+# Error handling
+teensy4-panic = { version = "0.2", features = ["log"] }
 
-[dependencies.teensy4-bsp]
-version = "^0.5"
-features = [
-    # Use the BSP's runtime.
-    "rt",
-]
+# Logging
+imxrt-log = { version = "0.1", default-features = false, features = ["log", "usbd"] }
+log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
 
-[features]
-# Standard pinout is the default (no need to specify a feature for it)
-default = []
-# Alternative pinout with A/B inverted and several pins disabled
-alternate_pinout = []
+# Additional feature support
+embedded-time = "0.12"
 
-# Remove separate usbd-hid-macros dependency to avoid conflicts
+# Memory allocation for no_std
+linked_list_allocator = "0.10"
+
+[build-dependencies]
+# For processing configuration files at build time
+toml = "0.5"
+serde = { version = "1.0", features = ["derive"] }
 
 # Don't optimize build dependencies, like proc macros.
 # Helps with build times.

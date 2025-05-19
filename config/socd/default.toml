@@ -1,0 +1,18 @@
+# Default SOCD (Simultaneous Opposite Cardinal Direction) configuration
+# This defines how contradictory inputs are resolved
+
+# SOCD resolution methods:
+# - "neutral": Both directions are turned off
+# - "last-win": The last input pressed takes priority
+# - "first-win": The first input pressed takes priority
+# - "up-priority": Up takes priority over down (only for up/down)
+# - "second-input-priority": Second directional input overrides the first
+
+[resolution_methods]
+left_right = "neutral"  # Left + Right = neutral
+up_down = "up-priority" # Up + Down = Up takes priority
+
+[custom_overrides]
+# Custom overrides for specific game situations can be defined here
+# Format: "input1+input2" = "result"
+# Example: "left+down" = "down-left"

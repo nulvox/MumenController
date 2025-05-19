@@ -1,0 +1,34 @@
+# Default pinout configuration for Teensy 4.0 Nintendo Switch Pro Controller
+# This maps button/input names to Teensy 4.0 pins
+
+# Digital inputs
+[digital]
+button_a = 2       # A button on pin 2
+button_b = 3       # B button on pin 3
+button_x = 4       # X button on pin 4
+button_y = 5       # Y button on pin 5
+button_l = 6       # L button on pin 6
+button_r = 7       # R button on pin 7
+button_zl = 8      # ZL button on pin 8
+button_zr = 9      # ZR button on pin 9
+button_plus = 10   # Plus button on pin 10
+button_minus = 11  # Minus button on pin 11
+button_home = 12   # Home button on pin 12
+button_capture = 14 # Capture button on pin 14
+button_l3 = 15     # Left stick press on pin 15
+button_r3 = 16     # Right stick press on pin 16
+dpad_up = 17       # D-pad Up on pin 17
+dpad_down = 18     # D-pad Down on pin 18
+dpad_left = 19     # D-pad Left on pin 19
+dpad_right = 20    # D-pad Right on pin 20
+
+# Analog inputs
+[analog]
+left_stick_x = 23  # Left stick X-axis on pin 23 (A10)
+left_stick_y = 22  # Left stick Y-axis on pin 22 (A9)
+right_stick_x = 21 # Right stick X-axis on pin 21 (A8)
+right_stick_y = 20 # Right stick Y-axis on pin 20 (A7)
+
+# Special functionality
+[special]
+lock_pin = 33      # Lock functionality on pin 33
