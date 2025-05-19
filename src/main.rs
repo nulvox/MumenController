@@ -6,11 +6,14 @@
 #![no_std]
 #![no_main]
 
-use teensy4_panic as _;
+// Custom panic handler
+mod panic_handler;
 mod spc;
 mod pinouts;
 // Cannot use std::boxed::Box in a no_std environment
 // We'll use a different approach
+
+// Remove the imports and use direct paths to the panic_handler functions
 
 #[rtic::app(device = teensy4_bsp, peripherals = true)]
 mod app {
@@ -86,98 +89,124 @@ mod app {
         keys: PadReport,
     }
 
+    // Minimal initialization focused ONLY on LED testing
     #[init(local = [bus: Option<UsbBusAllocator<Bus>> = None])]
     fn init(ctx: init::Context) -> (Shared, Local) {
-        // Initialize the board
-        // Get the hardware peripherals
-        let peripherals = ctx.device;
+        // Set section to initialization
+        crate::panic_handler::set_code_section(crate::panic_handler::SECTION_INIT);
+        crate::panic_handler::clear_error_flag();
         
-        // Initialize the board
-        let board = bsp::board::t40(peripherals);
+        // PURE LED TEST FIRMWARE
+        // Initialize only what's absolutely required
+        let device = ctx.device;
+        let board = bsp::board::t40(device);
+        let timer = board.pit.0;
         
-        // Get pins and components
-        // Extract components from the Resources struct
-        let mut pins = board.pins;
-        let mut timer = board.pit.0;
-        let mut gpio1 = board.gpio1;
-        let mut gpio2 = board.gpio2;
-        let mut gpio4 = board.gpio4;
+        // Set up the minimal USB requirements to avoid hardware issues
+        let bus = ctx.local.bus.insert(UsbBusAllocator::new(
+            BusAdapter::new(board.usb, &EP_MEMORY, &EP_STATE)
+        ));
         
-        // GPIOs are initialized by the BSP, no need for manual clock enabling
+        // Create minimal HID class with basic settings
+        let hid = HIDClass::new(
+            bus,
+            spc::KeyData::DESCRIPTOR,
+            50, // Long polling interval to save power
+        );
         
-        // Configure timer
-        timer.set_load_timer_value(LPUART_POLL_INTERVAL_MS);
-        timer.set_interrupt_enable(true);
-        timer.enable();
+        // Create a minimal device that just needs to exist
+        let device = UsbDeviceBuilder::new(bus, VID_PID)
+            .manufacturer("Mumen")
+            .product("Controller")
+            .serial_number("1")
+            .device_class(0)
+            .build();
         
-        // Create pinout configuration based on selected feature
-        // In no_std we use static references instead of Box
-        // Create a static buffer to store our pinout configuration
-        static mut PINOUT_BUFFER: [u8; 128] = [0; 128]; // Should be large enough
-        
-        // Safety: This is single-threaded init code
+        // Create the pinout configuration
         let pinout: &'static dyn PinoutConfig = unsafe {
-            // Store the actual implementation in the static buffer
-            let impl_pinout = pinouts::create_pinout();
-            
-            // Create a trait object pointing to our implementation
-            let trait_obj: &dyn PinoutConfig = &impl_pinout;
-            
-            // "Leak" the trait object to make it 'static
+            let trait_obj: &dyn PinoutConfig = &pinouts::create_pinout();
             core::mem::transmute::<&dyn PinoutConfig, &'static dyn PinoutConfig>(trait_obj)
         };
         
-        // Use the USB directly
-        let usbd = board.usb;
+        // Create empty keydata
+        let keydata = spc::KeyData::default();
         
-        // Configure pins using the pinout configuration
-        let pins_config = pinout.configure_pins(&mut pins, &mut gpio1, &mut gpio2, &mut gpio4);
-
-        timer.set_load_timer_value(LPUART_POLL_INTERVAL_MS);
-        timer.set_interrupt_enable(true);
-        timer.enable();
-
-        // Configure the USB bus
-        let bus = BusAdapter::new(usbd, &EP_MEMORY, &EP_STATE);
-        // Note: SPEED constant is defined but the BusAdapter doesn't have a set_speed method
-        // The speed is configured through other means in the USB stack
-        bus.set_interrupts(true);
+        // Create empty pins config
+        let pins_config = pinouts::PinConfig {
+            active_pins: 0,
+        };
         
-        // Ensure proper bus allocation
-        let bus = ctx.local.bus.insert(UsbBusAllocator::new(bus));
-        // Use a more conservative polling interval to reduce power consumption
-        // The dim power light suggests we might be drawing too much power
-        // Increase polling interval to further reduce power consumption
-        let polling_interval = 20; // Changed from 10ms to 20ms for better power efficiency
+        // Create dummy keys
+        let keys = spc::PadReport::new(&keydata);
         
-        // Use the KeyData descriptor from spc.rs
-        let hid = HIDClass::new(bus, spc::KeyData::DESCRIPTOR, polling_interval);
+        // DIRECT LED BLINKING TEST - NO ASYNC TASKS
+        // Run LED test directly in init to ensure it works
+        crate::panic_handler::set_code_section(crate::panic_handler::SECTION_LED_TEST);
         
-        // Configure the USB device with power-conscious settings
-        let device = UsbDeviceBuilder::new(bus, VID_PID)
-            .manufacturer("Mumen Industries")
-            .product("Mumen Controller")
-            .serial_number("12345")
-            .max_packet_size_0(64)
-            .build();
-// Initialize KeyData with default values and neutral positions for analog sticks
-let keydata = spc::KeyData {
-    buttons: 0,
-    hat: 0,
-    padding: 0,
-    lx: pinout.get_neutral_value(PinType::Lx),
-    ly: pinout.get_neutral_value(PinType::Ly),
-    rx: pinout.get_neutral_value(PinType::Rx),
-    ry: pinout.get_neutral_value(PinType::Ry),
-};
+        // Define all the GPIO bases we want to try
+        let gpio_bases = [
+            0x401B8000u32, // GPIO1
+            0x401BC000,    // GPIO2
+            0x401C0000,    // GPIO3
+            0x401C4000,    // GPIO4
+            0x400C0000,    // GPIO5
+            0x42000000,    // GPIO6 (most common for the LED)
+            0x42004000,    // GPIO7
+            0x4200C000,    // GPIO9
+        ];
         
-        // Create a new PadReport from the KeyData
-        let mut keys = spc::PadReport::new(&keydata);
+        // Loop forever, trying different GPIO pins
+        // The goal is to find ANY working LED configuration
+        loop {
+            for &gpio_base in gpio_bases.iter() {
+                // Try pins 3 and 13 - the most common for LED
+                for &pin in [3u8, 13].iter() {
+                    let led_mask = 1u32 << pin;
+                    
+                    unsafe {
+                        let gpio_base_ptr = gpio_base as *mut u32;
+                        let gdir = gpio_base_ptr.offset(1); // Direction register
+                        let dr = gpio_base_ptr.offset(0);   // Data register
+                        
+                        // Configure pin as output
+                        let current_gdir = core::ptr::read_volatile(gdir);
+                        core::ptr::write_volatile(gdir, current_gdir | led_mask);
+                        
+                        // Blink pattern: ON-OFF-ON-OFF-ON (SOS start)
+                        for _ in 0..5 {
+                            // LED ON
+                            let current_dr = core::ptr::read_volatile(dr);
+                            core::ptr::write_volatile(dr, current_dr | led_mask);
+                            
+                            // Delay 500ms
+                            for _ in 0..2000000 { core::hint::spin_loop(); }
+                            
+                            // LED OFF
+                            let current_dr = core::ptr::read_volatile(dr);
+                            core::ptr::write_volatile(dr, current_dr & !led_mask);
+                            
+                            // Delay 500ms
+                            for _ in 0..2000000 { core::hint::spin_loop(); }
+                        }
+                        
+                        // After blinking, if this is GPIO6 pin 13 (most likely to work),
+                        // test the panic handler by deliberately causing a panic
+                        if gpio_base == 0x42000000 && pin == 13 {
+                            // Set different code sections and error flags to test panic display
+                            crate::panic_handler::set_code_section(crate::panic_handler::SECTION_HID_REPORT);
+                            crate::panic_handler::set_error_flag(crate::panic_handler::ERR_HID_REPORT);
+                            
+                            // Trigger panic to test panic handler with reporting
+                            panic!("Testing panic handler with section={} error={}",
+                                crate::panic_handler::SECTION_HID_REPORT,
+                                crate::panic_handler::ERR_HID_REPORT);
+                        }
+                    }
+                }
+            }
+        }
         
-        // Clear the keys initially
-        keys.clear_keys();
-        
-        check_input::spawn().unwrap();
+        // Return minimal structs
         (
             Shared { keys },
             Local {
@@ -200,8 +229,17 @@ let keydata = spc::KeyData {
     //     ctx.local.poller.poll();
     // }
 
-    #[task(binds = USB_OTG1, shared = [keys], local = [device, hid, configured: bool = false, last_report: [u8; 8] = [0; 8]], priority = 2)]
+    // LED test is now run directly inside init instead of as a task
+
+    #[task(binds = USB_OTG1, shared = [keys], local = [device, hid, configured: bool = false, last_report: [u8; 8] = [0; 8], poll_counter: u32 = 0], priority = 2)]
     fn usb1(mut ctx: usb1::Context) {
+        // Ultra-minimal USB task - just basic polling for the LED test firmware
+        
+        // Set section to USB polling in panic handler
+        crate::panic_handler::set_code_section(crate::panic_handler::SECTION_USB_POLL);
+        crate::panic_handler::clear_error_flag();
+        
+        // Very minimal USB polling - just to avoid hanging
         let usb1::LocalResources {
             hid,
             device,
@@ -210,297 +248,27 @@ let keydata = spc::KeyData {
             ..
         } = ctx.local;
 
-        // Poll the USB device to process any pending events
-        // This returns a boolean indicating if there was any activity
-        let poll_result = device.poll(&mut [hid]);
-
-        // Check if the device is configured
-        let current_state = device.state();
+        // Just poll USB with minimal operations
+        let _ = device.poll(&mut [hid]);
         
-        if current_state == UsbDeviceState::Configured {
-            // Only configure once when the state changes to Configured
+        // Only do basic state tracking
+        if device.state() == usb_device::device::UsbDeviceState::Configured {
             if !*configured {
-                device.bus().configure();
                 *configured = true;
             }
             
-            // Send reports regularly to ensure controller is recognized
+            // Only do minimal report sending to avoid issues
             ctx.shared.keys.lock(|keys| {
-                // Get current report to compare
                 let curr_report = keys.as_ref();
-                
-                // Send on both conditions: if report changed OR every few iterations
-                let report_changed = curr_report != *last_report;
-                
-                if report_changed {
-                    // Store the current report
+                if curr_report != *last_report {
                     last_report.copy_from_slice(curr_report);
-                    
-                    // Simple error handling
-                    if let Err(_) = hid.push_input(keys) {
-                        // If push fails, try reconfiguring
-                        device.bus().configure();
-                    }
+                    let _ = hid.push_input(keys);
                 }
             });
         } else if *configured {
-            // Update our state tracking when device becomes unconfigured
             *configured = false;
         }
     }
 
-    #[task(shared = [ keys ], local = [
-        keydata,
-        pins,
-        pinout,
-        ])] 
-    async fn check_input(mut cx: check_input::Context) {
-        let mut dpad: u8;
-        
-        // Debug info - initial state check
-        let mut initial_state = 0u16;
-        
-        // Test each pin at startup, only checking configured pins
-        // With our new implementation, just set some initial state values
-        if cx.local.pinout.is_configured(PinType::A) {
-            initial_state |= 0x0001;
-        }
-        if cx.local.pinout.is_configured(PinType::B) {
-            initial_state |= 0x0002;
-        }
-        if cx.local.pinout.is_configured(PinType::X) {
-            initial_state |= 0x0004;
-        }
-        if cx.local.pinout.is_configured(PinType::Y) {
-            initial_state |= 0x0008;
-        }
-        // Set initial buttons state to show connected
-        cx.local.keydata.buttons = initial_state;
-        
-        loop {
-            dpad = 0;
-            // Access keys through cx.shared
-            cx.shared.keys.lock(|keys| {
-                keys.clear_keys();
-                // Reset buttons for this iteration
-                cx.local.keydata.buttons = 0;
-                
-                // Check buttons based on configuration
-                // With our dummy implementation, we'll simulate some button presses
-                // based on the configuration only
-                
-                // A and B buttons
-                if cx.local.pinout.is_configured(PinType::A) {
-                    cx.local.keydata.buttons |= spc::KEY_MASK_A;
-                }
-                if cx.local.pinout.is_configured(PinType::B) {
-                    cx.local.keydata.buttons |= spc::KEY_MASK_B;
-                }
-                
-                // X and Y buttons
-                if cx.local.pinout.is_configured(PinType::X) {
-                    cx.local.keydata.buttons |= spc::KEY_MASK_X;
-                }
-                if cx.local.pinout.is_configured(PinType::Y) {
-                    cx.local.keydata.buttons |= spc::KEY_MASK_Y;
-                }
-                
-                // Shoulder buttons
-                if cx.local.pinout.is_configured(PinType::L1) {
-                    cx.local.keydata.buttons |= spc::KEY_MASK_L1;
-                }
-                if cx.local.pinout.is_configured(PinType::R1) {
-                    cx.local.keydata.buttons |= spc::KEY_MASK_R1;
-                }
-                
-                // Trigger buttons (L2, R2) - only if configured
-                if cx.local.pinout.is_configured(PinType::L2) {
-                    cx.local.keydata.buttons |= spc::KEY_MASK_L2;
-                }
-                if cx.local.pinout.is_configured(PinType::R2) {
-                    cx.local.keydata.buttons |= spc::KEY_MASK_R2;
-                }
-                
-                // Thumbstick buttons (L3, R3) - only if configured
-                if cx.local.pinout.is_configured(PinType::L3) {
-                    cx.local.keydata.buttons |= spc::KEY_MASK_L3;
-                }
-                if cx.local.pinout.is_configured(PinType::R3) {
-                    cx.local.keydata.buttons |= spc::KEY_MASK_R3;
-                }
-                
-                // Lock only if configured
-                let lock_active = cx.local.pinout.is_configured(PinType::Lock);
-                
-                // Handle lock-dependent buttons (Select, Start, Home) - only if lock is active
-                if lock_active {
-                    if cx.local.pinout.is_configured(PinType::Select) {
-                        cx.local.keydata.buttons |= spc::KEY_MASK_SELECT;
-                    }
-                    if cx.local.pinout.is_configured(PinType::Start) {
-                        cx.local.keydata.buttons |= spc::KEY_MASK_START;
-                    }
-                    if cx.local.pinout.is_configured(PinType::Home) {
-                        cx.local.keydata.buttons |= spc::KEY_MASK_HOME;
-                    }
-                }
-                // Get directional inputs - simulated based on configuration
-                let t_analog_left = cx.local.pinout.is_configured(PinType::AnalogLeft);
-                let t_analog_right = cx.local.pinout.is_configured(PinType::AnalogRight);
-                let up_pressed = cx.local.pinout.is_configured(PinType::Up);
-                let down_pressed = cx.local.pinout.is_configured(PinType::Down);
-                let left_pressed = cx.local.pinout.is_configured(PinType::Left);
-                let right_pressed = cx.local.pinout.is_configured(PinType::Right);
-                
-                // AnalogStick toggle set to left stick
-                // Set analog stick values based on pinout configuration
-                if cx.local.pinout.is_configured(PinType::Lx) && cx.local.pinout.is_configured(PinType::Ly) {
-                    if t_analog_left {
-                        // Handle Y-axis
-                        if up_pressed {
-                            if down_pressed {
-                                cx.local.keydata.ly = 255;
-                            } else {
-                                cx.local.keydata.ly = 64;
-                            }
-                        } else if down_pressed {
-                            cx.local.keydata.ly = 0;
-                        } else {
-                            // Ensure neutral position if no input
-                            cx.local.keydata.ly = 128;
-                        }
-                        
-                        // Handle X-axis
-                        if left_pressed {
-                            if right_pressed {
-                                cx.local.keydata.lx = 64;
-                            } else {
-                                cx.local.keydata.lx = 0;
-                            }
-                        } else if right_pressed {
-                            cx.local.keydata.lx = 255;
-                        } else {
-                            // Ensure neutral position if no input
-                            cx.local.keydata.lx = 128;
-                        }
-                    }
-                } else {
-                    // Set neutral values for unconfigured analog sticks
-                    cx.local.keydata.lx = cx.local.pinout.get_neutral_value(PinType::Lx);
-                    cx.local.keydata.ly = cx.local.pinout.get_neutral_value(PinType::Ly);
-                }
-                // AnalogStick toggle set to right stick
-                // Set right analog stick values based on pinout configuration
-                if cx.local.pinout.is_configured(PinType::Rx) && cx.local.pinout.is_configured(PinType::Ry) {
-                    if t_analog_right {
-                        // Handle Y-axis
-                        if up_pressed {
-                            if down_pressed {
-                                cx.local.keydata.ry = 255;
-                            } else {
-                                cx.local.keydata.ry = 64;
-                            }
-                        } else if down_pressed {
-                            cx.local.keydata.ry = 0;
-                        } else {
-                            // Ensure neutral position if no input
-                            cx.local.keydata.ry = 128;
-                        }
-                        
-                        // Handle X-axis
-                        if left_pressed {
-                            if right_pressed {
-                                cx.local.keydata.rx = 64;
-                            } else {
-                                cx.local.keydata.rx = 0;
-                            }
-                        } else if right_pressed {
-                            cx.local.keydata.rx = 255;
-                        } else {
-                            // Ensure neutral position if no input
-                            cx.local.keydata.rx = 128;
-                        }
-                    }
-                } else {
-                    // Set neutral values for unconfigured analog sticks
-                    cx.local.keydata.rx = cx.local.pinout.get_neutral_value(PinType::Rx);
-                    cx.local.keydata.ry = cx.local.pinout.get_neutral_value(PinType::Ry);
-                }
-                
-                // If neither analog toggle is active or toggles not configured, process D-Pad
-                if !t_analog_left && !t_analog_right {
-                    // Check up and down, clean SOCD with safe error handling
-                    if up_pressed {
-                        dpad |= spc::HAT_MASK_UP;
-                    }
-                    if down_pressed {
-                        dpad |= spc::HAT_MASK_DOWN;
-                    }
-                    // Check left and right
-                    if left_pressed {
-                        dpad |= spc::HAT_MASK_LEFT;
-                    }
-                    if right_pressed {
-                        dpad |= spc::HAT_MASK_RIGHT;
-                    }
-                }
-                
-                // Always update the PadReport regardless of which toggle is active
-                // This ensures all button presses are registered
-                let mut updated_keys = spc::PadReport::new(&cx.local.keydata);
-                
-                // Ensure hat switch is properly set if D-pad was active
-                if dpad > 0 {
-                    updated_keys.set_hat(dpad);
-                }
-                
-                // Advanced debug mode to test multiple button combinations
-                // This helps identify which buttons the application recognizes
-                let debug_mode = 0; // 0=off, 1=A button, 2=X+Y, 3=all buttons
-                
-                if debug_mode > 0 {
-                    match debug_mode {
-                        1 => {
-                            // Force A button only
-                            cx.local.keydata.buttons |= spc::KEY_MASK_A;
-                        },
-                        2 => {
-                            // Force X+Y buttons (many applications recognize these)
-                            cx.local.keydata.buttons |= spc::KEY_MASK_X;
-                            cx.local.keydata.buttons |= spc::KEY_MASK_Y;
-                        },
-                        3 => {
-                            // Force all standard buttons
-                            cx.local.keydata.buttons = 0xFFFF; // All 16 bits set
-                        },
-                        _ => {}
-                    }
-                    
-                    // Update with forced buttons
-                    updated_keys = spc::PadReport::new(&cx.local.keydata);
-                    
-                    // Also force D-pad up to test hat switch
-                    if debug_mode == 3 {
-                        updated_keys.set_hat(spc::HAT_MASK_UP);
-                    } else if dpad > 0 {
-                        // Otherwise preserve existing hat state
-                        updated_keys.set_hat(dpad);
-                    }
-                }
-                
-                // Copy the updated values to the shared keys object
-                *keys = updated_keys;
-                
-                // Reset the buttons for the next update, but after we've already sent the report
-                cx.local.keydata.buttons = 0;
-            });
-            
-            // Replace busy-wait spin loop with proper sleep to reduce power consumption
-            // This allows the processor to enter a low-power state between polls
-            // 10ms delay provides good balance between responsiveness and power efficiency
-            rtic_monotonics::systick::Systick::delay(
-                rtic_monotonics::systick::fugit::Duration::<u32, 1, 1000>::from_ticks(10)
-            ).await;
-        }
-    }
+    // Removed check_input task - we're focusing only on the LED test
 }

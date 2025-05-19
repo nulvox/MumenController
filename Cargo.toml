@@ -28,8 +28,8 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 #     "release_max_level_info",
 # ] }
 
-# teensy4-panic = { version = "0.2", features = ["log"] }
-teensy4-panic = "^0.2"
+# Removed dependency on teensy4-panic as we now use a custom panic handler
+# teensy4-panic = "^0.2"
 
 [dependencies.teensy4-bsp]
 version = "^0.5"

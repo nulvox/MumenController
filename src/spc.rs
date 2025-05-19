@@ -90,6 +90,19 @@ impl AsRef<[u8]> for KeyData {
         }
     }
 }
+impl Default for KeyData {
+    fn default() -> Self {
+        Self {
+            buttons: 0,
+            hat: 0,
+            padding: 0,
+            lx: 128, // Center position
+            ly: 128, // Center position
+            rx: 128, // Center position
+            ry: 128, // Center position
+        }
+    }
+}
 
 /// Hid report for a 3-button mouse with a wheel.
 #[derive(Clone, Copy, Serialize)]
