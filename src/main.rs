@@ -86,6 +86,7 @@ mod app {
     // Remove unused imports
     use linked_list_allocator::LockedHeap;
     use crate::ALLOCATOR;
+    use core::sync::atomic::{AtomicBool, Ordering};
 
     // Teensy 4.0 board definition
     use board::t40 as my_board;
@@ -94,6 +95,10 @@ mod app {
     use crate::usb::{SwitchProDevice, SwitchProReport};
     use crate::input::{DigitalInputHandler, AnalogInputHandler, SocdHandler, LockHandler};
     use crate::config::{PinoutConfig, SocdConfig};
+    
+    // Add a static flag to track whether initialization is complete
+    // This prevents the USB interrupt handler from accessing the USB device too early
+    static USB_INIT_COMPLETE: AtomicBool = AtomicBool::new(false);
 
     use rtic_monotonics::systick::{Systick, *};
 
@@ -270,6 +275,11 @@ mod app {
         
         // Log successful initialization
         log::info!("Nintendo Switch Pro Controller firmware initialized successfully");
+        
+        // Set the initialization complete flag to allow USB interrupt handler to start polling
+        // This MUST happen after USB device is fully initialized and before returning
+        USB_INIT_COMPLETE.store(true, Ordering::SeqCst);
+        log::info!("USB initialization complete flag set");
         
         // Return the shared and local resources
         (
@@ -508,9 +518,18 @@ mod app {
         // Poll the USB device to handle any pending interrupts
         // This is now properly shared with the controller task
         // to ensure USB operations are properly synchronized
-        cx.shared.usb_device.lock(|usb_device| {
-            // Non-blocking poll in interrupt context
-            let _ = usb_device.poll();
-        });
+        // Only poll the USB device if initialization is complete
+        // This prevents the race condition where the interrupt handler
+        // accesses the USB device before it's fully initialized
+        if USB_INIT_COMPLETE.load(Ordering::SeqCst) {
+            cx.shared.usb_device.lock(|usb_device| {
+                // Non-blocking poll in interrupt context
+                let _ = usb_device.poll();
+            });
+        } else {
+            // Skip USB polling if initialization is not complete
+            // This is crucial for preventing the race condition
+            log::trace!("USB interrupt skipped - initialization not complete");
+        }
     }
 }

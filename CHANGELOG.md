@@ -26,6 +26,12 @@
   - Improved memory allocation for USB device
   - Optimized descriptor implementation for memory efficiency
 
+- **Fixed USB Initialization Race Condition**:
+  - Resolved a critical race condition between USB initialization sequence and interrupt handler
+  - Fixed irregular LED blink patterns that occurred during device startup
+  - Implemented proper synchronization mechanisms between initialization process and USB events
+  - Improved overall device reliability during the boot sequence
+  - Eliminated intermittent connection failures when connecting to hosts
 ## Version 1.2.0 (2025-05-15)
 
 ### Major Improvements
