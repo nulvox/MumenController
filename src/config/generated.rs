@@ -122,9 +122,7 @@ impl PinoutConfig {
 
     /// Get all special pin mappings as (name, pin) pairs
     pub fn get_special_pins() -> &'static [(&'static str, u8)] {
-        &[
-            ("lock_pin", 33),
-        ]
+        &[("lock_pin", 33)]
     }
 }
 
@@ -149,10 +147,7 @@ pub mod socd_methods {
 impl SocdConfig {
     /// Get SOCD resolution methods as (input_pair, method) pairs
     pub fn get_resolution_methods() -> &'static [(&'static str, &'static str)] {
-        &[
-            ("left_right", "neutral"),
-            ("up_down", "up-priority"),
-        ]
+        &[("left_right", "neutral"), ("up_down", "up-priority")]
     }
 
     /// Get custom SOCD overrides as (input_combo, result) pairs

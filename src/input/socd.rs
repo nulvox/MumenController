@@ -57,7 +57,7 @@ impl SocdHandler {
             first_input_order: [true; 2],
         }
     }
-    
+
     /// Create a new SOCD handler with custom resolution methods
     pub fn with_methods(left_right: SocdMethod, up_down: SocdMethod) -> Self {
         Self {
@@ -67,20 +67,23 @@ impl SocdHandler {
             first_input_order: [true; 2],
         }
     }
-    
+
     /// Create a new SOCD handler with method strings
     pub fn from_strings(left_right: &'static str, up_down: &'static str) -> Self {
-        Self::with_methods(
-            SocdMethod::from(left_right),
-            SocdMethod::from(up_down)
-        )
+        Self::with_methods(SocdMethod::from(left_right), SocdMethod::from(up_down))
     }
-    
+
     /// Resolve contradictory directional inputs
     ///
     /// Takes inputs for left, right, up, and down
     /// Returns resolved states for each direction
-    pub fn resolve(&mut self, left: bool, right: bool, up: bool, down: bool) -> (bool, bool, bool, bool) {
+    pub fn resolve(
+        &mut self,
+        left: bool,
+        right: bool,
+        up: bool,
+        down: bool,
+    ) -> (bool, bool, bool, bool) {
         // Check for left+right conflict
         let (resolved_left, resolved_right) = if left && right {
             self.resolve_left_right(left, right)
@@ -95,7 +98,7 @@ impl SocdHandler {
             }
             (left, right)
         };
-        
+
         // Check for up+down conflict
         let (resolved_up, resolved_down) = if up && down {
             self.resolve_up_down(up, down)
@@ -110,16 +113,16 @@ impl SocdHandler {
             }
             (up, down)
         };
-        
+
         // Update last states for next frame
         self.last_states[0] = left;
         self.last_states[1] = right;
         self.last_states[2] = up;
         self.last_states[3] = down;
-        
+
         (resolved_left, resolved_right, resolved_up, resolved_down)
     }
-    
+
     /// Resolve left+right conflict
     fn resolve_left_right(&self, left: bool, right: bool) -> (bool, bool) {
         match self.left_right_method {
@@ -136,7 +139,7 @@ impl SocdHandler {
                     // Default to right in this case
                     (false, true)
                 }
-            },
+            }
             SocdMethod::FirstWin => {
                 if self.first_input_order[0] {
                     // Left was first
@@ -145,7 +148,7 @@ impl SocdHandler {
                     // Right was first
                     (false, true)
                 }
-            },
+            }
             SocdMethod::SecondInputPriority => {
                 if self.last_states[0] && !self.last_states[1] {
                     // Left was already active, right was just pressed
@@ -157,12 +160,12 @@ impl SocdHandler {
                     // Both were just pressed - treat as neutral
                     (false, false)
                 }
-            },
+            }
             // Up priority doesn't apply to left+right
             _ => (false, false),
         }
     }
-    
+
     /// Resolve up+down conflict
     fn resolve_up_down(&self, up: bool, down: bool) -> (bool, bool) {
         match self.up_down_method {
@@ -180,7 +183,7 @@ impl SocdHandler {
                     // Default to up in this case
                     (true, false)
                 }
-            },
+            }
             SocdMethod::FirstWin => {
                 if self.first_input_order[1] {
                     // Up was first
@@ -189,7 +192,7 @@ impl SocdHandler {
                     // Down was first
                     (false, true)
                 }
-            },
+            }
             SocdMethod::SecondInputPriority => {
                 if self.last_states[2] && !self.last_states[3] {
                     // Up was already active, down was just pressed
@@ -201,10 +204,10 @@ impl SocdHandler {
                     // Both were just pressed - treat as neutral
                     (false, false)
                 }
-            },
+            }
         }
     }
-    
+
     /// Convert directional inputs to HAT value for Switch Pro controller
     ///
     /// HAT values:
@@ -221,7 +224,7 @@ impl SocdHandler {
             (false, false, true, true) => 5,  // South-West
             (false, false, false, true) => 6, // West
             (true, false, false, true) => 7,  // North-West
-            _ => 8, // None/Released or invalid combination
+            _ => 8,                           // None/Released or invalid combination
         }
     }
 }

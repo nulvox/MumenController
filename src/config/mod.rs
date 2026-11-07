@@ -54,7 +54,9 @@ impl core::fmt::Display for ConfigError {
         match self {
             ConfigError::MissingPin(pin) => write!(f, "Missing required pin: {}", pin),
             ConfigError::MissingRule(rule) => write!(f, "Missing required SOCD rule: {}", rule),
-            ConfigError::InvalidValue(name, value) => write!(f, "Invalid value for {}: {}", name, value),
+            ConfigError::InvalidValue(name, value) => {
+                write!(f, "Invalid value for {}: {}", name, value)
+            }
         }
     }
 }
@@ -99,23 +101,23 @@ pub fn resolve_socd_conflict(input1: &str, input2: &str) -> &'static str {
         match (input1, input2) {
             ("left", "right") => "left_right",
             ("up", "down") => "up_down",
-            _ => "unknown_pair" // Fallback for other combinations
+            _ => "unknown_pair", // Fallback for other combinations
         }
     } else {
         match (input2, input1) {
             ("left", "right") => "left_right",
             ("up", "down") => "up_down",
-            _ => "unknown_pair" // Fallback for other combinations
+            _ => "unknown_pair", // Fallback for other combinations
         }
     };
-    
+
     // Look for custom overrides first for known pairs
     for (combo, result) in SocdConfig::get_custom_overrides() {
         if *combo == pair_name {
             return result;
         }
     }
-    
+
     // Use the standard resolution method
     SocdConfig::get_method_for_pair(pair_name)
 }

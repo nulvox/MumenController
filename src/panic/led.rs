@@ -3,8 +3,8 @@
 //! This module implements different blink patterns for the onboard LED
 //! to signal different types of errors.
 
-use teensy4_bsp::board::Led;
 use crate::panic::ErrorType;
+use teensy4_bsp::board::Led;
 
 /// LED Error Blinker for visual error feedback
 pub struct LedErrorBlinker {
@@ -67,7 +67,7 @@ impl LedErrorBlinker {
     fn blink_pattern_hard_fault(&mut self) -> ! {
         // Initial delay to distinguish the beginning of the pattern
         self.delay_ms(700);
-        
+
         loop {
             self.led.set();
             self.delay_ms(200);
@@ -80,7 +80,7 @@ impl LedErrorBlinker {
     fn blink_pattern_memory_error(&mut self) -> ! {
         // Initial delay to distinguish the beginning of the pattern
         self.delay_ms(700);
-        
+
         loop {
             self.blink_long();
             self.blink_short();
@@ -93,7 +93,7 @@ impl LedErrorBlinker {
     fn blink_pattern_usb_error(&mut self) -> ! {
         // Initial delay to distinguish the beginning of the pattern
         self.delay_ms(700);
-        
+
         loop {
             self.blink_long();
             self.blink_short();
@@ -110,7 +110,7 @@ impl LedErrorBlinker {
     fn blink_pattern_init_error(&mut self) -> ! {
         // Initial delay to distinguish the beginning of the pattern
         self.delay_ms(700);
-        
+
         loop {
             // 3 long blinks pattern for InitError
             self.blink_long();
@@ -124,7 +124,7 @@ impl LedErrorBlinker {
     fn blink_pattern_config_error(&mut self) -> ! {
         // Initial delay to distinguish the beginning of the pattern
         self.delay_ms(700);
-        
+
         loop {
             self.blink_short();
             self.blink_long();
@@ -137,25 +137,25 @@ impl LedErrorBlinker {
     fn blink_pattern_sos(&mut self) -> ! {
         // Initial delay to distinguish the beginning of the pattern
         self.delay_ms(700);
-        
+
         loop {
             // S (...)
             for _ in 0..3 {
                 self.blink_short();
             }
             self.delay_ms(200);
-            
+
             // O (---)
             for _ in 0..3 {
                 self.blink_long();
             }
             self.delay_ms(200);
-            
+
             // S (...)
             for _ in 0..3 {
                 self.blink_short();
             }
-            
+
             self.delay_ms(1000); // Pause between pattern repetitions
         }
     }

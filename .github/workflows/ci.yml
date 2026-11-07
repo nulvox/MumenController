@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Format and check firmware
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install Teensy 4.0 Rust target
+        run: rustup target add thumbv7em-none-eabihf
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check firmware
+        run: cargo check --target thumbv7em-none-eabihf
