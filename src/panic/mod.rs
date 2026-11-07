@@ -15,13 +15,13 @@ pub use led::*;
 pub fn debug_blink_stage(led: &mut teensy4_bsp::board::Led, stage: u8) {
     // First turn off LED to ensure we start from a known state
     led.set();
-    
+
     // Simple delay implementation
     let delay_ms = |ms: u32| {
         let cycles_per_ms = teensy4_bsp::board::ARM_FREQUENCY / 1000;
         cortex_m::asm::delay(ms * cycles_per_ms);
     };
-    
+
     // Blink the LED the specified number of times to indicate the stage
     for _ in 0..stage {
         led.clear();
@@ -29,7 +29,7 @@ pub fn debug_blink_stage(led: &mut teensy4_bsp::board::Led, stage: u8) {
         led.set();
         delay_ms(100);
     }
-    
+
     // Longer delay to separate stages
     delay_ms(500);
 }

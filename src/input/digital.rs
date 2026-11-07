@@ -2,8 +2,8 @@
 //!
 //! This module handles digital inputs (buttons) with debouncing.
 
-use crate::util::debounce::Debouncer;
 use crate::config::PinoutConfig;
+use crate::util::debounce::Debouncer;
 use core::convert::TryFrom;
 use log::debug;
 
@@ -33,7 +33,7 @@ pub enum ControllerButton {
 /// Map from button enum to index in button array
 impl TryFrom<usize> for ControllerButton {
     type Error = ();
-    
+
     fn try_from(index: usize) -> Result<Self, Self::Error> {
         match index {
             0 => Ok(ControllerButton::A),
@@ -97,13 +97,26 @@ impl DigitalInputHandler {
     pub fn new() -> Self {
         // Initialize all debouncers in released state
         let debouncers = [
-            Debouncer::new(), Debouncer::new(), Debouncer::new(), Debouncer::new(),
-            Debouncer::new(), Debouncer::new(), Debouncer::new(), Debouncer::new(),
-            Debouncer::new(), Debouncer::new(), Debouncer::new(), Debouncer::new(),
-            Debouncer::new(), Debouncer::new(), Debouncer::new(), Debouncer::new(),
-            Debouncer::new(), Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
+            Debouncer::new(),
         ];
-        
+
         // Default mapping from pinout configuration
         let button_mapping = [
             (2, ControllerButton::A),
@@ -125,32 +138,32 @@ impl DigitalInputHandler {
             (19, ControllerButton::DpadLeft),
             (20, ControllerButton::DpadRight),
         ];
-        
+
         Self {
             debouncers,
             button_mapping,
             button_states: [false; 18],
         }
     }
-    
+
     /// Read input from a specific pin
     pub fn read_pin(&self, pin: u8) -> bool {
         // This is a placeholder - in a real implementation, this would
         // read from the GPIO pins using the Teensy BSP
         // For now, we'll simulate button presses based on pin number
-        
+
         // Accessing pins would normally involve the MCU's GPIO module
         // For example, something like:
         // gpio.read_pin(pin) == PinState::High
-        
+
         false // Default to not pressed
     }
-    
+
     /// Update button states based on pin readings
     pub fn update(&mut self, pins_state: &[bool]) -> ([bool; 14], [bool; 4]) {
         let mut standard_buttons = [false; 14]; // Non-dpad buttons for report
         let mut dpad = [false; 4]; // Up, Down, Left, Right
-        
+
         // Update each button's state with debouncing
         for (i, (pin, button)) in self.button_mapping.iter().enumerate() {
             // Read the pin state from the passed array if it's within range,
@@ -160,11 +173,11 @@ impl DigitalInputHandler {
             } else {
                 false
             };
-            
+
             // Apply debouncing
             let debounced_state = self.debouncers[i].update(pin_value);
             self.button_states[i] = debounced_state;
-            
+
             // Map to appropriate output array
             match button {
                 ControllerButton::DpadUp => dpad[0] = debounced_state,
@@ -179,22 +192,22 @@ impl DigitalInputHandler {
                 }
             }
         }
-        
+
         (standard_buttons, dpad)
     }
-    
+
     /// Get raw button states without updating
     pub fn get_raw_states(&self) -> [bool; 18] {
         self.button_states
     }
-    
+
     /// Get dpad states as a tuple (up, down, left, right)
     pub fn get_dpad_states(&self) -> (bool, bool, bool, bool) {
         let up = self.button_states[14]; // Index for DpadUp
         let down = self.button_states[15]; // Index for DpadDown
         let left = self.button_states[16]; // Index for DpadLeft
         let right = self.button_states[17]; // Index for DpadRight
-        
+
         (up, down, left, right)
     }
 }
