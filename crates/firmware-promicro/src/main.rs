@@ -1,7 +1,15 @@
 //! SparkFun Pro Micro / Arduino Leonardo (ATmega32U4) Nintendo Switch USB HID fight stick firmware.
 //!
-//! Uses upstream `arduino-hal`, `avr-device`, `atmega-usbd`, `usb-device`, and `usbd-hid`
-//! with the shared `mumen-core` engine.
+//! ## Low-Latency Design (informed by [inputlag.science](https://inputlag.science/controller))
+//!
+//! - **1 ms (`1000 Hz`) Full-Speed USB Polling (`FS_POLL_INTERVAL_MS = 1`)**: Eliminates the
+//!   0–4 ms (2.0 ms avg) USB polling penalty of a 4 ms `bInterval`.
+//! - **Prompt-Detection Debouncing (`0 ms` edge delay)**: Immediate transition on the first
+//!   1 ms USB SOF sample with a 4 ms (`4 * 1 ms`) contact bounce lockout window.
+//! - **Synchronous USB-Coupled Sampling**: Samples the GPIO ports directly inside the USB
+//!   SOF / endpoint interrupt right before pushing the 8-byte report into the IN FIFO,
+//!   following Loïc *WydD* Petit's synchronous sampling recommendation on
+//!   [inputlag.science](https://inputlag.science/controller).
 
 #![no_std]
 #![no_main]
@@ -23,8 +31,8 @@ use usb_device::{
 };
 use usbd_hid::hid_class::HIDClass;
 
-/// Full-Speed USB polling interval in ms (matches `UnlicProController/Descriptors.c`).
-const FS_POLL_INTERVAL_MS: u8 = 4;
+/// Full-Speed USB polling interval in ms (`1` = 1 ms / 1000 Hz native polling rate).
+const FS_POLL_INTERVAL_MS: u8 = 1;
 
 static mut USB_BUS: Option<UsbBusAllocator<UsbBus<PLL>>> = None;
 static mut USB_CTX: Option<UsbContext<PLL>> = None;
