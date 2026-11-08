@@ -74,7 +74,6 @@ static ALLOCATOR: LockedHeap = LockedHeap::empty();
 // Import our custom modules
 mod config;
 mod input;
-mod panic;
 mod usb;
 mod util;
 
@@ -154,15 +153,7 @@ mod app {
         // Initial debug indication that we're starting the init sequence
         led.clear(); // LED is active low, so clear turns it on
 
-        // IMPROVEMENT: Enhanced initialization debug instrumentation
-        // The debug_blink_stage function now provides visual feedback during
-        // initialization to help diagnose where failures occur. Each stage
-        // is indicated by a specific number of blinks, making it easier to
-        // identify which part of initialization is failing.
-        use crate::panic::debug_blink_stage;
-
         // Stage 1: Initialize the memory allocator using a static memory area with MaybeUninit
-        debug_blink_stage(&mut led, 1);
         use core::mem::MaybeUninit;
         static mut HEAP: MaybeUninit<[u8; 8192]> = MaybeUninit::uninit();
         unsafe {
@@ -174,10 +165,6 @@ mod app {
         }
 
         // Stage 2: Extract the remaining resources we need
-        // IMPROVEMENT: Sequential stage tracking helps identify peripheral initialization issues
-        debug_blink_stage(&mut led, 2);
-
-        // Extract the remaining resources we need
         let mut gpio1 = board_resources.gpio1;
         let mut gpio3 = board_resources.gpio3;
         let usb = board_resources.usb;
@@ -188,8 +175,6 @@ mod app {
         log::info!("Initializing logging (disabled)...");
 
         // Stage 3: Create a NullPoller instance and initialize systick timer
-        // IMPROVEMENT: Stage 3 initialization now has clearer error handling
-        debug_blink_stage(&mut led, 3);
         // This is a safe replacement for the unsafe zeroed memory that was causing panics
         let poller = NullPoller;
 
@@ -204,10 +189,6 @@ mod app {
         log::info!("Nintendo Switch Pro Controller firmware initializing...");
 
         // Stage 4: Initialize input handlers with configurations from TOML
-        // IMPROVEMENT: Enhanced configuration validation during input handler setup
-        // The system now performs more thorough validation of input configurations
-        // and provides clearer error messages for configuration issues
-        debug_blink_stage(&mut led, 4);
         log::info!("Initializing input handlers...");
 
         // Digital input handler with debounce configuration
@@ -217,7 +198,6 @@ mod app {
         let mut analog_handler = AnalogInputHandler::new();
 
         // Stage 5: Initialize SOCD handler with rules from configuration
-        debug_blink_stage(&mut led, 5);
         let mut socd_handler = SocdHandler::new();
         // Load the SOCD methods from the configuration
         let left_right_method = SocdConfig::get_method_for_pair("left_right");
@@ -225,7 +205,6 @@ mod app {
         socd_handler = SocdHandler::from_strings(left_right_method, up_down_method);
 
         // Stage 6: Initialize lock handler for menu button protection
-        debug_blink_stage(&mut led, 6);
         let lock_pin = if let Some((_, pin)) = PinoutConfig::get_special_pins()
             .iter()
             .find(|(name, _)| *name == "lock_pin")
@@ -238,11 +217,8 @@ mod app {
         let lock_handler = LockHandler::new();
 
         // Stage 7: Initialize digital pins
-        debug_blink_stage(&mut led, 7);
         log::info!("Configuring digital input pins...");
 
-        // Verification blink to confirm we've reached this point
-        debug_blink_stage(&mut led, 8);
         // Configure digital pins as inputs with pull-ups
         for &(_, pin) in PinoutConfig::get_digital_pins() {
             // In a real implementation, this would configure GPIO pins
@@ -258,7 +234,6 @@ mod app {
         }
 
         // Stage 8: Initialize USB device for Nintendo Switch communication
-        debug_blink_stage(&mut led, 8);
         log::info!("Initializing USB HID device...");
 
         // Initialize the USB device for Nintendo Switch Pro Controller communication

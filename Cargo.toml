@@ -1,7 +1,11 @@
+[workspace]
+members = ["crates/mumen-core"]
+
 [package]
 name = "mumen-controller"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
 description = "Nintendo Switch Pro Controller firmware for Teensy 4.0"
 authors = ["Mumen Controller Project"]
 

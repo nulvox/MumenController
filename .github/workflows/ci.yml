@@ -29,5 +29,8 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+      - name: Test portable core
+        run: cargo test -p mumen-core
+
       - name: Check firmware
         run: cargo check --target thumbv7em-none-eabihf
