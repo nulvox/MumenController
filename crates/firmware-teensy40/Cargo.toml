@@ -1,0 +1,22 @@
+[package]
+name = "firmware-teensy40"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Teensy 4.0 Nintendo Switch USB HID fight stick firmware"
+
+[[bin]]
+name = "firmware-teensy40"
+path = "src/main.rs"
+test = false
+bench = false
+
+[dependencies]
+mumen-core = { path = "../mumen-core" }
+rtic = { version = "2", features = ["thumbv7-backend"] }
+rtic-monotonics = { version = "1", default-features = false, features = ["cortex-m-systick"] }
+teensy4-bsp = { version = "0.5", features = ["rt"] }
+teensy4-panic = "0.2"
+usb-device = { version = "0.2", features = ["control-buffer-256"] }
+usbd-hid = "0.6"
+embedded-hal = "1.0"
