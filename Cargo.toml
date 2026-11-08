@@ -3,8 +3,22 @@ resolver = "2"
 members = [
     "crates/mumen-core",
     "crates/firmware-teensy40",
+    "crates/firmware-promicro",
 ]
+
+# Configure size optimizations needed for AVR (32 KB flash on ATmega32U4)
+[profile.dev]
+panic = "abort"
+opt-level = "s"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
 
 # Don't optimize build dependencies, like proc macros.
 [profile.release.build-override]
+opt-level = 0
+[profile.dev.build-override]
 opt-level = 0
