@@ -17,6 +17,14 @@ compile_error!(
     "Select a Pro Micro layout feature: layout-promicro-standard or layout-promicro-classic"
 );
 
+#[cfg(all(
+    feature = "layout-promicro-standard",
+    feature = "layout-promicro-classic"
+))]
+compile_error!(
+    "Pro Micro layout features are mutually exclusive; pass --no-default-features --features <layout>"
+);
+
 use arduino_hal::port::{
     mode::{Input, Output, PullUp},
     Pin,

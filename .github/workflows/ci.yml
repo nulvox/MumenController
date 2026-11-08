@@ -96,18 +96,19 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Test portable core
-        run: cargo test -p mumen-core --target x86_64-unknown-linux-gnu
+        run: cargo test -p mumen-core
 
       - name: Build Teensy 4.0 firmware (all layout features) and package .hex blobs
+        working-directory: crates/firmware-teensy40
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          mkdir -p dist
+          mkdir -p ../../dist
           for layout in layout-standard layout-alternate layout-d16 layout-d16s layout-a4d17; do
-            cargo build --release -p firmware-teensy40 --target thumbv7em-none-eabihf --no-default-features --features "$layout"
+            cargo build --release --no-default-features --features "$layout"
             arm-none-eabi-objcopy -O ihex \
-              target/thumbv7em-none-eabihf/release/firmware-teensy40 \
-              "dist/mumen-teensy40-${VERSION}-${layout}.hex"
+              ../../target/thumbv7em-none-eabihf/release/firmware-teensy40 \
+              "../../dist/mumen-teensy40-${VERSION}-${layout}.hex"
           done
 
       - name: Build ATmega32U4 Pro Micro firmware (all layout features) and package .hex blobs

@@ -19,7 +19,6 @@ teensy4-bsp = { version = "0.5", features = ["rt"] }
 teensy4-panic = "0.2"
 usb-device = { version = "0.2", features = ["control-buffer-256"] }
 usbd-hid = "0.6"
-embedded-hal = "1.0"
 
 [features]
 default = ["layout-standard"]

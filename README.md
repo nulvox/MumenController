@@ -116,7 +116,7 @@ Select a layout with `--no-default-features --features <layout>`:
 ### 1. Run Host Unit Tests (`mumen-core`)
 
 ```sh
-cargo test -p mumen-core --target x86_64-unknown-linux-gnu
+cargo test -p mumen-core
 ```
 
 ### 2. Build & Flash Teensy 4.0 (`firmware-teensy40`)
@@ -126,11 +126,13 @@ rustup target add thumbv7em-none-eabihf
 rustup component add llvm-tools-preview
 cargo install cargo-binutils
 
+cd crates/firmware-teensy40
+
 # Build default layout (layout-standard), or pass --no-default-features --features layout-d16s
-cargo build --release -p firmware-teensy40 --target thumbv7em-none-eabihf
+cargo build --release
 
 # Convert ELF to Intel HEX for Teensy Loader
-cargo objcopy --release -p firmware-teensy40 --target thumbv7em-none-eabihf -- -O ihex mumen-teensy40.hex
+cargo objcopy --release -- -O ihex mumen-teensy40.hex
 ```
 
 Flash `mumen-teensy40.hex` using [Teensy Loader](https://www.pjrc.com/teensy/loader.html) or `teensy_loader_cli --mcu=TEENSY40 -w mumen-teensy40.hex`.

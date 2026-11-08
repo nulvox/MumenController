@@ -18,6 +18,34 @@ compile_error!(
     "Select a Teensy 4.0 layout feature: layout-standard, layout-alternate, layout-d16, layout-d16s, or layout-a4d17"
 );
 
+#[cfg(any(
+    all(
+        feature = "layout-standard",
+        any(
+            feature = "layout-alternate",
+            feature = "layout-d16",
+            feature = "layout-d16s",
+            feature = "layout-a4d17"
+        )
+    ),
+    all(
+        feature = "layout-alternate",
+        any(
+            feature = "layout-d16",
+            feature = "layout-d16s",
+            feature = "layout-a4d17"
+        )
+    ),
+    all(
+        feature = "layout-d16",
+        any(feature = "layout-d16s", feature = "layout-a4d17")
+    ),
+    all(feature = "layout-d16s", feature = "layout-a4d17")
+))]
+compile_error!(
+    "Teensy 4.0 layout features are mutually exclusive; pass --no-default-features --features <layout>"
+);
+
 use mumen_core::{ButtonMask, Debouncer, LogicalInputs};
 use teensy4_bsp::hal::{gpio, iomuxc};
 use teensy4_bsp::pins::t40::Pins;
