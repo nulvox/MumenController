@@ -1,44 +1,29 @@
-[package]
-name = "mumen-controller"
+[workspace]
+resolver = "2"
+members = [
+    "crates/mumen-core",
+    "crates/firmware-teensy40",
+    "crates/firmware-promicro",
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
-description = "Nintendo Switch Pro Controller firmware for Teensy 4.0"
-authors = ["Mumen Controller Project"]
+license = "MIT OR Apache-2.0"
 
-[dependencies]
-# Core dependencies
-rtic = { version = "2", features = ["thumbv7-backend"] }
-rtic-monotonics = { version = "1", default-features = false, features = ["cortex-m-systick"] }
-teensy4-bsp = { version = "0.5", features = ["rt"] }
+# Configure size optimizations needed for AVR (32 KB flash on ATmega32U4)
+[profile.dev]
+panic = "abort"
+opt-level = "s"
 
-# USB HID implementation
-usb-device = "0.2"
-usbd-hid = "0.6"
-
-# Embedded utilities
-embedded-hal = "0.2"
-cortex-m = "0.7"
-cortex-m-rt = "0.7"
-
-# Error handling
-teensy4-panic = { version = "0.2", features = ["log"] }
-
-# Logging
-imxrt-log = { version = "0.1", default-features = false, features = ["log", "usbd"] }
-log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
-
-# Additional feature support
-embedded-time = "0.12"
-
-# Memory allocation for no_std
-linked_list_allocator = "0.10"
-
-[build-dependencies]
-# For processing configuration files at build time
-toml = "0.5"
-serde = { version = "1.0", features = ["derive"] }
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
 
 # Don't optimize build dependencies, like proc macros.
-# Helps with build times.
 [profile.release.build-override]
+opt-level = 0
+[profile.dev.build-override]
 opt-level = 0

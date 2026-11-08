@@ -1,109 +1,182 @@
 # MumenController
 
-`MumenController` is an experimental `no_std` Rust firmware project for building a wired Nintendo Switch-style fight stick on a Teensy 4.0. It combines compile-time TOML pin/SOCD configuration, an RTIC application, input debouncing and filtering, and a custom USB HID report path.
+`MumenController` is a multi-target `no_std` Rust firmware workspace for wired Nintendo Switch fight sticks and arcade controllers, supporting both the **Teensy 4.0** (ARM Cortex-M7) and the **SparkFun Pro Micro / Arduino Leonardo** (ATmega32U4).
 
-> **Project status:** the USB descriptor, report packing, configuration generation, and controller loop are implemented, but the GPIO and ADC read functions are still placeholders in the current source. Treat this repository as active firmware development rather than a ready-to-flash controller release.
+It implements the licensed HORI Pokken Tournament DX Pro Pad USB HID report format (`0x0F0D:0x0092`, 86-byte report descriptor, 8-byte input and output reports) first proven in [`UnlicProController`](https://github.com/nulvox/UnlicProController), allowing the Nintendo Switch and PC hosts to recognize the controller natively over USB without proprietary handshakes.
 
-## Architecture
+---
+
+## Workspace Architecture
 
 ```text
-Buttons / D-pad ──> GPIO scan ──> debounce ──> SOCD / lock logic ─┐
-Analog sticks ────> ADC scan ───> filter + deadzone ──────────────┤
-                                                                  v
-Teensy 4.0 / RTIC task ──> 8-byte Switch-style HID report ──> USB host
-        ^                                                        │
-        └──────── USB interrupt handling and connection state ───┘
+MumenController/
+├── crates/
+│   ├── mumen-core/          # Hardware-agnostic no_std core (#![forbid(unsafe_code)], host-tested)
+│   │   └── src/
+│   │       ├── hid.rs       # 86-byte HORI/Switch HID report descriptor & 8-byte SwitchReport
+│   │       ├── socd.rs      # Neutral, PrimaryPriority (Up/Left), and LastWin SOCD resolvers
+│   │       ├── debounce.rs  # Compact shift-register switch debouncer (2 bytes/switch)
+│   │       └── input.rs     # LogicalInputs, Dpad/Analog/Smash modes, Shift & Lock handling
+│   ├── firmware-teensy40/   # Teensy 4.0 (NXP i.MX RT1062, Cortex-M7) RTIC v2 firmware
+│   │   └── src/
+│   │       ├── main.rs      # USB_OTG1 High-Speed HID ISR + 1 ms Systick scan task
+│   │       └── pins.rs      # Real iomuxc + gpio::Input / ADC1 wiring across 5 layout features
+│   └── firmware-promicro/   # SparkFun Pro Micro / Leonardo (ATmega32U4) AVR firmware
+│       └── src/
+│           ├── main.rs      # 48 MHz PLL init + USB_GEN/USB_COM interrupt-driven HID
+│           └── pins.rs      # 16 pull-up switch inputs + Red/Blue mode indicator LEDs
+└── .github/workflows/ci.yml # zizmor security audit, mumen-core tests, Teensy & AVR release builds
 ```
 
-Pin and SOCD profiles are read from `config/` by `build.rs` and converted into Rust constants at compile time.
+### Core Features (`mumen-core`)
+- **Zero-Allocation, Hardware-Agnostic Engine**: Pure `no_std` Rust with `#![forbid(unsafe_code)]` and zero HAL dependencies, unit-tested on the host (`cargo test -p mumen-core`).
+- **SOCD Cleaning**: Configurable Simultaneous Opposing Cardinal Directions resolution (`Neutral`, `PrimaryPriority` for Up/Left priority, and edge-tracked `LastWin`). Default HitBox profile resolves `Left + Right -> Neutral` and `Up + Down -> Up`.
+- **Directional Modes**:
+  - **Hardware Toggle Switches** (Teensy 4.0 `layout-standard`): Dedicated toggle inputs route directional switches to the D-pad (HAT), Left Stick, or Right Stick.
+  - **Software Mode Cycling** (`SHIFT + HOME` rising-edge chord on Pro Micro and `layout-d16s`): Cycles between `Dpad`, `Analog` (Left Stick, or Right Stick while `Shift` is held), and `Smash` (full stick throw `0`/`255`, or half-tilt `64`/`192` walk/tilt modifier while `Shift` is held).
+- **Tournament Lock Switch**: Suppresses menu buttons (`Plus`/`Start`, `Minus`/`Select`, `Home`, `Capture`) when engaged to prevent accidental tournament disqualifications.
+- **Shift-Register Debouncing**: 4-sample shift-register debouncer per switch with zero heap usage.
 
-## Timing model: 1 ms intervals, not a latency guarantee
+---
 
-Two separate parts of the source target a 1 ms cadence:
+## Timing & USB Polling
 
-- `src/usb/device.rs` passes `1` as the HID interrupt endpoint polling interval (`bInterval`), allowing the USB host to poll at a nominal **1000 Hz / 1 ms** interval when the host and bus schedule permit.
-- `src/main.rs` delays the RTIC controller loop by `1.millis()` after each input-processing and report-send attempt, targeting approximately one scan/report cycle per millisecond plus execution and scheduling time.
+- **Teensy 4.0 (`firmware-teensy40`)**:
+  - Runs on USB 2.0 High-Speed (`imxrt-usbd`) with `bInterval = 4` ($2^{4-1} \times 125\,\mu\text{s} = 1\,\text{ms}$ / 1000 Hz host polling interval).
+  - Samples and debounces GPIO/ADC inputs inside a 1 ms RTIC `Systick` task while servicing USB control and interrupt endpoints inside the hardware `USB_OTG1` ISR.
+- **SparkFun Pro Micro / Leonardo (`firmware-promicro`)**:
+  - Runs on USB 2.0 Full-Speed (`atmega-usbd`) with a 4 ms `bInterval` matching `UnlicProController`.
+  - Services USB endpoints, samples switches, and updates the Red/Blue mode LEDs inside the `USB_GEN` / `USB_COM` interrupt handlers while sleeping the AVR core in the main loop.
 
-These settings describe the requested USB report interval and firmware loop design. They do **not** prove sub-millisecond end-to-end input latency: actual latency also includes switch debounce, loop execution, USB scheduling, host processing, display/game timing, and the unfinished hardware input implementation.
+---
 
-## Teensy 4.0 pinout and wiring
+## Hardware Pinout & Layout Profiles
 
-The table below is generated from the checked-in defaults in [`config/pinout/default.toml`](config/pinout/default.toml).
+All momentary button and directional switches are wired between the MCU pin and **GND** (using internal pull-up resistors).
 
-| Input | Teensy 4.0 pin | Suggested wiring |
-|---|---:|---|
-| A / B / X / Y | 2 / 3 / 4 / 5 | Momentary switch between GPIO and GND; firmware is intended to use pull-ups |
-| L / R | 6 / 7 | Momentary switch between GPIO and GND |
-| ZL / ZR | 8 / 9 | Momentary switch between GPIO and GND |
-| Plus / Minus | 10 / 11 | Momentary switch between GPIO and GND |
-| Home | 12 | Momentary switch between GPIO and GND |
-| Capture | 14 | Momentary switch between GPIO and GND |
-| L3 / R3 | 15 / 16 | Momentary switch between GPIO and GND |
-| D-pad Up / Down | 17 / 18 | Direction switch between GPIO and GND |
-| D-pad Left / Right | 19 / 20 | Direction switch between GPIO and GND |
-| Left stick X / Y | 23 (A10) / 22 (A9) | Potentiometer wiper to analog pin; outer terminals to 3.3 V and GND |
-| Right stick X / Y | 21 (A8) / 20 (A7) | Potentiometer wiper to analog pin; outer terminals to 3.3 V and GND |
-| Menu lock | 33 | Switch input used to mask Home, Plus, Minus, and Capture |
-| Status LED | 13 | Teensy 4.0 onboard LED |
+### Teensy 4.0 (`crates/firmware-teensy40`)
 
-**Pin conflict in the default profile:** pin 20 is assigned to both D-pad Right and Right Stick Y. Choose one function or edit `config/pinout/default.toml` before wiring hardware. Keep all input voltages within the Teensy 4.0's 3.3 V logic limits and share a common ground.
+Select a layout at compile time with `--no-default-features --features <layout>`:
 
-## Features under development
+| Input | `layout-standard` *(default)* | `layout-alternate` | `layout-d16` | `layout-d16s` | `layout-a4d17` |
+|---|---:|---:|---:|---:|---:|
+| **A** | P14 | P11 | P0 | P0 | P0 |
+| **B** | P11 | P14 | P1 | P1 | P1 |
+| **X** | P9 | P9 | P2 | P2 | P2 |
+| **Y** | P16 | P16 | P3 | P3 | P3 |
+| **L (L1)** | P15 | P15 | P4 | P4 | P4 |
+| **R (R1)** | P10 | P10 | P5 | P5 | P5 |
+| **ZL (L2)** | P12 | — | P6 | P6 | P6 |
+| **ZR (R2)** | P13 | — | P7 | P7 | P7 |
+| **L3** | P3 | — | — | — | P11 |
+| **R3** | P2 | — | — | — | P12 |
+| **Minus (Select)** | P18 | P18 | P8 | P8 | P8 |
+| **Plus (Start)** | P17 | P17 | P9 | P9 | P9 |
+| **Home** | P8 | P8 | P10 | P10 | P10 |
+| **Capture** | — | — | P11 | — | — |
+| **Shift** | — | — | — | P11 | — |
+| **D-pad Up** | P1 | P1 | P12 | P12 | P13 |
+| **D-pad Down** | P6 | P6 | P13 | P13 | P14 |
+| **D-pad Left** | P7 | P7 | P14 | P14 | P15 |
+| **D-pad Right** | P19 | P19 | P15 | P15 | P16 |
+| **Analog Left Toggle** | P4 | — | — | — | — |
+| **Analog Right Toggle** | P5 | — | — | — | — |
+| **Tournament Lock** | P0 *(100k pull-down)* | — | — | — | — |
+| **Left Stick X / Y (ADC1)** | — | — | — | — | P17 / P18 |
+| **Right Stick X / Y (ADC1)** | — | — | — | — | P19 / P20 |
 
-- Nintendo Switch-style 8-byte USB HID input reports
-- Compile-time button, analog input, lock-pin, and SOCD configuration
-- Neutral, first-input, last-input, up-priority, and second-input SOCD modes
-- Digital debounce and analog filtering/deadzone modules
-- RTIC task structure with USB interrupt handling
-- LED-based startup and panic diagnostics
+### SparkFun Pro Micro / Arduino Leonardo (`crates/firmware-promicro`)
 
-## Build
+Select a layout with `--no-default-features --features <layout>`:
+- `layout-promicro-standard` *(default)*: Matches `UnlicProController`.
+- `layout-promicro-classic`: Permutes `L/R/ZL/ZR` and `Minus/Plus/Home` masks to match the legacy `origin/hid` wiring.
 
-### Prerequisites
+| Input / Indicator | Pro Micro Pin | ATmega32U4 Port | Notes |
+|---|---|---|---|
+| **A** | `D3` | `PD0` | Internal pull-up (active low to GND) |
+| **B** | `D1` (`TX0`) | `PD3` | Internal pull-up |
+| **X** | `A0` | `PF7` | Internal pull-up |
+| **Y** | `D15` (`SCK`) | `PB1` | Internal pull-up |
+| **L (LB)** | `A1` | `PF6` | Internal pull-up |
+| **R (RB)** | `D5` | `PC6` | Internal pull-up |
+| **ZL (LT)** | `A2` | `PF5` | Internal pull-up |
+| **ZR (RT)** | `D0` (`RX1`) | `PD2` | Internal pull-up |
+| **Minus (Select)** | `D14` (`MISO`) | `PB3` | Internal pull-up |
+| **Plus (Start)** | `D10` | `PB6` | Internal pull-up |
+| **Home** | `D16` (`MOSI`) | `PB2` | Internal pull-up |
+| **Shift** | `D2` | `PD1` | Internal pull-up (`SHIFT + HOME` cycles modes) |
+| **Up / Down / Left / Right** | `D7 / D8 / D6 / D9` | `PE6 / PB4 / PD7 / PB5` | Internal pull-up |
+| **Red Mode LED** | `A3` | `PF4` | Output (`Analog` = Red, `Smash` = Red+Blue) |
+| **Blue Mode LED** | `D4` | `PD4` | Output (`Dpad` = Blue, `Smash` = Red+Blue) |
 
-Install Rust, the Cortex-M target, and the binary tools used to create a Teensy Loader image:
+---
+
+## Building, Testing, and Flashing
+
+### 1. Run Host Unit Tests (`mumen-core`)
+
+```sh
+cargo test -p mumen-core
+```
+
+### 2. Build & Flash Teensy 4.0 (`firmware-teensy40`)
 
 ```sh
 rustup target add thumbv7em-none-eabihf
 rustup component add llvm-tools-preview
 cargo install cargo-binutils
+
+cd crates/firmware-teensy40
+
+# Build default layout (layout-standard), or pass --no-default-features --features layout-d16s
+cargo build --release
+
+# Convert ELF to Intel HEX for Teensy Loader
+cargo objcopy --release -- -O ihex mumen-teensy40.hex
 ```
 
-The repository does not currently contain a `.cargo/config.toml`, so specify the target explicitly:
+Flash `mumen-teensy40.hex` using [Teensy Loader](https://www.pjrc.com/teensy/loader.html) or `teensy_loader_cli --mcu=TEENSY40 -w mumen-teensy40.hex`.
+
+### 3. Build & Flash ATmega32U4 Pro Micro (`firmware-promicro`)
+
+Requires `avr-gcc`, `avr-libc`, `binutils-avr`, and the Rust `nightly` toolchain with `rust-src` (for `-Z build-std=core` on `avr-none`):
 
 ```sh
-git clone https://github.com/nulvox/MumenController.git
-cd MumenController
+rustup toolchain install nightly --profile minimal --component rust-src
 
-cargo fmt --all -- --check
-cargo check --target thumbv7em-none-eabihf
-cargo build --release --target thumbv7em-none-eabihf
-cargo objcopy --release --target thumbv7em-none-eabihf -- -O ihex MumenController.hex
+cd crates/firmware-promicro
+cargo +nightly build --release
+
+# Convert ELF to Intel HEX and flash with avrdude
+avr-objcopy -O ihex -R .eeprom ../../target/avr-none/release/firmware-promicro.elf mumen-promicro.hex
+avrdude -p atmega32u4 -c avr109 -P /dev/ttyACM0 -U flash:w:mumen-promicro.hex:i
 ```
 
-Load `MumenController.hex` with [Teensy Loader](https://www.pjrc.com/teensy/loader.html) after the hardware-facing input implementation is complete and verified.
+---
 
-## Configuration
+## CI, Release Blobs, & Supply-Chain Security
 
-Edit the default profiles before building:
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push, pull request, and semantic version tag (`vMAJOR.MINOR.PATCH`):
+1. **Workflow Security Audit**: Static analysis via [`zizmor`](https://github.com/zizmorcore/zizmor-action) with SHA-pinned actions and least-privilege `GITHUB_TOKEN` permissions.
+2. **Version & Ancestry Validation**: Single-sourced `[workspace.package] version` in root `Cargo.toml`. When a `vMAJOR.MINOR.PATCH` tag is pushed, CI verifies that:
+   - the tag matches the semantic version pattern `^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`,
+   - the tag version matches `Cargo.toml`'s `[workspace.package] version`, and
+   - the tagged commit is an ancestor of `main`.
+3. **Formatting & Core Unit Tests**: `cargo fmt --all -- --check` and `cargo test -p mumen-core`.
+4. **Multi-Target Firmware Builds & `.hex` Packaging**: Builds all 5 Teensy 4.0 layout features and both ATmega32U4 Pro Micro layout features in release mode, converts each ELF to a versioned Intel `.hex` image (`mumen-teensy40-${VERSION}-${layout}.hex` and `mumen-promicro-${VERSION}-${layout}.hex`) with `SHA256SUMS`, and uploads them as workflow artifacts.
+5. **Automated GitHub Releases**: Pushing a verified `vMAJOR.MINOR.PATCH` tag on `main` automatically publishes a GitHub Release with all 7 pre-built `.hex` firmware blobs and `SHA256SUMS`.
 
-- [`config/pinout/default.toml`](config/pinout/default.toml) — digital, analog, and lock-pin assignments
-- [`config/socd/default.toml`](config/socd/default.toml) — opposite-direction resolution rules
+---
 
-The current `build.rs` reads the `default` profiles directly. Additional profile selection via environment variables is not yet wired into the build script.
+## Related Projects
 
-## Related work
-
-- [`nulvox/UnlicProController`](https://github.com/nulvox/UnlicProController) is the earlier AVR C fight-stick implementation for the SparkFun Pro Micro / ATmega32U4. `MumenController` carries the controller concept into an embedded Rust and Teensy 4.0 design.
-- [`nulvox/usbd-human-interface-device`](https://github.com/nulvox/usbd-human-interface-device) is a companion fork used for experimentation with additional device-side USB HID definitions. The current `MumenController` manifest uses the crates.io `usbd-hid` package directly, so the fork is related context rather than a checked-in dependency.
-
-## Documentation
-
-- [Quick start](docs/QUICK_START.md)
-- [Technical notes](docs/TECHNICAL.md)
-- [Testing](docs/TESTING.md)
-- [Debugging](docs/DEBUG.md)
+- [`nulvox/UnlicProController`](https://github.com/nulvox/UnlicProController) — Original C / LUFA fight stick implementation for the ATmega32U4 Pro Micro.
 
 ## License
 
-No `LICENSE` file is currently included. A license should be selected explicitly before one is added.
+Dual-licensed under either of:
+
+- Apache License, Version 2.0 ([`LICENSE-APACHE`](LICENSE-APACHE))
+- MIT License ([`LICENSE-MIT`](LICENSE-MIT))
+
+at your option.

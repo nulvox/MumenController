@@ -1,0 +1,10 @@
+[package]
+name = "mumen-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Hardware-agnostic Switch fight stick HID report, SOCD, debouncing, and input mode core"
+
+[lib]
+name = "mumen_core"
+path = "src/lib.rs"
