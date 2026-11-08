@@ -152,12 +152,13 @@ avrdude -p atmega32u4 -c avr109 -P /dev/ttyACM0 -U flash:w:mumen-promicro.hex:i
 
 ---
 
-## CI & Supply-Chain Security
+## CI, Release Blobs, & Supply-Chain Security
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request:
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push, pull request, and version tag:
 1. **Workflow Security Audit**: Static analysis via [`zizmor`](https://github.com/zizmorcore/zizmor-action) with SHA-pinned actions and least-privilege `GITHUB_TOKEN` permissions.
 2. **Formatting & Core Unit Tests**: `cargo fmt --all -- --check` and `cargo test -p mumen-core`.
-3. **Multi-Target Firmware Builds**: Full release builds and linker verification across all 5 Teensy 4.0 layout features and both ATmega32U4 Pro Micro layout features.
+3. **Multi-Target Firmware Builds & `.hex` Packaging**: Builds all 5 Teensy 4.0 layout features and both ATmega32U4 Pro Micro layout features in release mode, converts each ELF to an Intel `.hex` image (`mumen-teensy40-*.hex` and `mumen-promicro-*.hex`) with `SHA256SUMS`, and uploads them as workflow artifacts.
+4. **Automated GitHub Releases**: Every merge/push to `main` automatically publishes/updates the rolling `latest` pre-release with the compiled `.hex` blobs and checksums, and pushing a `v*.*.*` tag publishes a versioned GitHub Release.
 
 ---
 
