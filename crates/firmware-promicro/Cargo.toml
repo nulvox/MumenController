@@ -1,0 +1,28 @@
+[package]
+name = "firmware-promicro"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "SparkFun Pro Micro / Arduino Leonardo (ATmega32U4) Nintendo Switch USB HID fight stick firmware"
+
+[[bin]]
+name = "firmware-promicro"
+path = "src/main.rs"
+test = false
+bench = false
+
+[dependencies]
+mumen-core = { path = "../mumen-core" }
+panic-halt = "1.0"
+usb-device = "0.2"
+usbd-hid = "0.6"
+avr-device = { version = "0.5.4", features = ["atmega32u4", "rt"] }
+atmega-usbd = { git = "https://github.com/agausmann/atmega-usbd.git", rev = "5fc68ca813ce0a37dab65dd4d66efe1ec125f2a8" }
+arduino-hal = { git = "https://github.com/Rahix/avr-hal.git", rev = "e490872a61ae195933f501a5cbb10a2055e059f4", features = ["arduino-leonardo"] }
+
+[features]
+default = ["layout-promicro-standard"]
+# UnlicProController / Pro Micro 16-switch + Red/Blue mode indicator LED layout
+layout-promicro-standard = []
+# Classic MumenController origin/hid layout (L1/R1/L2/R2 and Select/Start/Home swapped)
+layout-promicro-classic = []
