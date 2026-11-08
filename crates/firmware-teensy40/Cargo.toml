@@ -20,3 +20,16 @@ teensy4-panic = "0.2"
 usb-device = { version = "0.2", features = ["control-buffer-256"] }
 usbd-hid = "0.6"
 embedded-hal = "1.0"
+
+[features]
+default = ["layout-standard"]
+# Full 20-pin Teensy 4.0 layout (P0..P19: 13 buttons + 4 D-pad + AnalogLeft/AnalogRight toggles + Lock)
+layout-standard = []
+# 16-pin Teensy 4.0 layout with A/B swapped on P11/P14 and no L2/R2/L3/R3/Lock/AnalogToggles
+layout-alternate = []
+# 16-pin sequential layout (P0..P15) with Capture button (matches switchspec/d16.yml)
+layout-d16 = []
+# 16-pin sequential layout (P0..P15) with Shift modifier for Dpad/Analog/Smash modes (matches switchspec/d16s.yml)
+layout-d16s = []
+# 17-pin digital + 4-axis ADC analog stick layout (P0..P16 digital + P17..P20 ADC, matches switchspec/a4d17.yml)
+layout-a4d17 = []

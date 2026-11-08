@@ -32,5 +32,8 @@ jobs:
       - name: Test portable core
         run: cargo test -p mumen-core --target x86_64-unknown-linux-gnu
 
-      - name: Build Teensy 4.0 firmware (release)
-        run: cargo build --release -p firmware-teensy40 --target thumbv7em-none-eabihf
+      - name: Build Teensy 4.0 firmware (all layout features)
+        run: |
+          for layout in layout-standard layout-alternate layout-d16 layout-d16s layout-a4d17; do
+            cargo build --release -p firmware-teensy40 --target thumbv7em-none-eabihf --no-default-features --features "$layout"
+          done

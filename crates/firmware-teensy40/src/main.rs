@@ -4,17 +4,20 @@
 //! - Single-owner USB polling inside the `USB_OTG1` hardware interrupt (`usb1`)
 //! - Proper `imxrt-usbd` bus configuration (`device.bus().configure()`) upon enumeration
 //! - High-Speed `bInterval = 4` ($2^{4-1} \times 125\,\mu\text{s} = 1\,\text{ms}$ / 1000 Hz)
-//! - 1 ms `Systick` input scan loop driving the portable `mumen-core` engine
+//! - 1 ms `Systick` input scan loop reading real Teensy 4.0 GPIO/ADC pins via `pins::BoardInputs`
 
 #![no_std]
 #![no_main]
 
 use teensy4_panic as _;
 
+mod pins;
+
 #[rtic::app(device = teensy4_bsp, peripherals = true, dispatchers = [KPP])]
 mod app {
+    use crate::pins::BoardInputs;
     use mumen_core::{
-        ControllerEngine, LogicalInputs, SwitchReport, HORI_POKKEN_PID, HORI_VID, REPORT_DESCRIPTOR,
+        ControllerEngine, SwitchReport, HORI_POKKEN_PID, HORI_VID, REPORT_DESCRIPTOR,
     };
     use rtic_monotonics::systick::{Systick, *};
     use teensy4_bsp::board;
@@ -44,6 +47,7 @@ mod app {
 
     #[local]
     struct Local {
+        inputs: BoardInputs,
         engine: ControllerEngine,
         hid: HIDClass<'static, Bus>,
         device: UsbDevice<'static, Bus>,
@@ -54,12 +58,15 @@ mod app {
         let board::Resources {
             usb,
             pins,
+            mut gpio1,
             mut gpio2,
+            mut gpio4,
+            adc1,
             ..
         } = board::t40(cx.device);
 
-        let led = board::led(&mut gpio2, pins.p13);
-        led.set();
+        // Configure physical Teensy 4.0 GPIO/ADC pads for the selected layout feature
+        let inputs = BoardInputs::new(pins, &mut gpio1, &mut gpio2, &mut gpio4, adc1);
 
         // Start 1 kHz Systick monotonic for the input polling task
         Systick::start(
@@ -93,6 +100,7 @@ mod app {
         (
             Shared { report },
             Local {
+                inputs,
                 engine,
                 hid,
                 device,
@@ -102,12 +110,13 @@ mod app {
 
     /// Periodic 1 ms input scan task.
     ///
-    /// Slice 3 wires the physical Teensy 4.0 GPIO pins and layout profiles into `LogicalInputs`.
-    #[task(shared = [report], local = [engine], priority = 1)]
+    /// Samples and debounces all configured hardware switches (and ADC axes if enabled),
+    /// runs SOCD/mode/lock processing via `mumen-core`, and updates the shared USB report.
+    #[task(shared = [report], local = [inputs, engine], priority = 1)]
     async fn scan_inputs(mut cx: scan_inputs::Context) {
         loop {
-            let inputs = LogicalInputs::neutral();
-            let next_report = cx.local.engine.update(&inputs);
+            let logical = cx.local.inputs.sample();
+            let next_report = cx.local.engine.update(&logical);
 
             cx.shared.report.lock(|report| {
                 *report = next_report;
