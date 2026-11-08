@@ -55,8 +55,9 @@ use teensy4_bsp::pins::t40::Pins;
 const PULLUP_CONFIG: iomuxc::Config =
     iomuxc::Config::zero().set_pull_keeper(Some(iomuxc::PullKeeper::Pullup100k));
 
-/// Number of consecutive 1 ms samples required to transition a switch state.
-const DEBOUNCE_SAMPLES: u8 = 4;
+/// Number of 200 µs (5 kHz) scan ticks for the prompt-detection bounce lockout window.
+/// `20 * 200 µs = 4.0 ms` of contact bounce immunity with **0 µs** of initial edge delay.
+const DEBOUNCE_SAMPLES: u8 = 20;
 
 /// Helper to read an active-low input pin (`!pin.is_set()`) through a [`Debouncer`].
 #[inline]
@@ -506,8 +507,15 @@ mod imp {
             gpio1: &mut gpio::Port<1>,
             gpio2: &mut gpio::Port<2>,
             gpio4: &mut gpio::Port<4>,
-            adc1: adc::Adc<1>,
+            mut adc1: adc::Adc<1>,
         ) -> Self {
+            // Optimize ADC1 for minimum latency (inputlag.science):
+            // 8-bit native resolution matches the 0..=255 Switch HID axis range directly,
+            // with 1-sample hardware averaging and fast conversion speed.
+            adc1.set_resolution(adc::ResolutionBits::Res8);
+            adc1.set_averaging(adc::AveragingCount::Avg1);
+            adc1.set_conversion_speed(adc::ConversionSpeed::Fast);
+
             iomuxc::configure(&mut pins.p0, PULLUP_CONFIG);
             iomuxc::configure(&mut pins.p1, PULLUP_CONFIG);
             iomuxc::configure(&mut pins.p2, PULLUP_CONFIG);
@@ -554,9 +562,8 @@ mod imp {
         }
 
         #[inline]
-        fn adc10_to_u8(sample: u16) -> u8 {
-            // Default `imxrt-hal` ADC resolution is 10-bit (0..=1023); scale to 8-bit (0..=255)
-            (sample.min(1023) >> 2) as u8
+        fn adc8_to_u8(sample: u16) -> u8 {
+            sample.min(255) as u8
         }
 
         pub fn sample(&mut self) -> LogicalInputs {
@@ -607,10 +614,10 @@ mod imp {
             inputs.dpad.left = read_active_low(&self.pin_left, &mut self.debouncers[15]);
             inputs.dpad.right = read_active_low(&self.pin_right, &mut self.debouncers[16]);
 
-            inputs.lx = Self::adc10_to_u8(self.adc1.read_blocking(&mut self.pin_lx));
-            inputs.ly = Self::adc10_to_u8(self.adc1.read_blocking(&mut self.pin_ly));
-            inputs.rx = Self::adc10_to_u8(self.adc1.read_blocking(&mut self.pin_rx));
-            inputs.ry = Self::adc10_to_u8(self.adc1.read_blocking(&mut self.pin_ry));
+            inputs.lx = Self::adc8_to_u8(self.adc1.read_blocking(&mut self.pin_lx));
+            inputs.ly = Self::adc8_to_u8(self.adc1.read_blocking(&mut self.pin_ly));
+            inputs.rx = Self::adc8_to_u8(self.adc1.read_blocking(&mut self.pin_rx));
+            inputs.ry = Self::adc8_to_u8(self.adc1.read_blocking(&mut self.pin_ry));
 
             inputs
         }
