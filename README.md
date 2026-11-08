@@ -154,11 +154,15 @@ avrdude -p atmega32u4 -c avr109 -P /dev/ttyACM0 -U flash:w:mumen-promicro.hex:i
 
 ## CI, Release Blobs, & Supply-Chain Security
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on every push, pull request, and version tag:
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push, pull request, and semantic version tag (`vMAJOR.MINOR.PATCH`):
 1. **Workflow Security Audit**: Static analysis via [`zizmor`](https://github.com/zizmorcore/zizmor-action) with SHA-pinned actions and least-privilege `GITHUB_TOKEN` permissions.
-2. **Formatting & Core Unit Tests**: `cargo fmt --all -- --check` and `cargo test -p mumen-core`.
-3. **Multi-Target Firmware Builds & `.hex` Packaging**: Builds all 5 Teensy 4.0 layout features and both ATmega32U4 Pro Micro layout features in release mode, converts each ELF to an Intel `.hex` image (`mumen-teensy40-*.hex` and `mumen-promicro-*.hex`) with `SHA256SUMS`, and uploads them as workflow artifacts.
-4. **Automated GitHub Releases**: Every merge/push to `main` automatically publishes/updates the rolling `latest` pre-release with the compiled `.hex` blobs and checksums, and pushing a `v*.*.*` tag publishes a versioned GitHub Release.
+2. **Version & Ancestry Validation**: Single-sourced `[workspace.package] version` in root `Cargo.toml`. When a `vMAJOR.MINOR.PATCH` tag is pushed, CI verifies that:
+   - the tag matches the semantic version pattern `^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`,
+   - the tag version matches `Cargo.toml`'s `[workspace.package] version`, and
+   - the tagged commit is an ancestor of `main`.
+3. **Formatting & Core Unit Tests**: `cargo fmt --all -- --check` and `cargo test -p mumen-core`.
+4. **Multi-Target Firmware Builds & `.hex` Packaging**: Builds all 5 Teensy 4.0 layout features and both ATmega32U4 Pro Micro layout features in release mode, converts each ELF to a versioned Intel `.hex` image (`mumen-teensy40-${VERSION}-${layout}.hex` and `mumen-promicro-${VERSION}-${layout}.hex`) with `SHA256SUMS`, and uploads them as workflow artifacts.
+5. **Automated GitHub Releases**: Pushing a verified `vMAJOR.MINOR.PATCH` tag on `main` automatically publishes a GitHub Release with all 7 pre-built `.hex` firmware blobs and `SHA256SUMS`.
 
 ---
 
