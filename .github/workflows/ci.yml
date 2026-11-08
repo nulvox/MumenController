@@ -7,6 +7,9 @@ on:
     branches:
       - main
       - cleanup
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
 
 permissions:
   contents: read
@@ -43,12 +46,50 @@ jobs:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Install AVR GCC toolchain and Rust targets
+      - name: Resolve and validate release version
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          SHA: ${{ github.sha }}
+        run: |
+          CARGO_VER=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          if [ -z "$CARGO_VER" ]; then
+            echo "Failed to read workspace version from Cargo.toml" >&2
+            exit 1
+          fi
+
+          if [ "$REF_TYPE" = "tag" ]; then
+            if ! printf '%s\n' "$REF_NAME" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+              echo "Tag '$REF_NAME' is not a valid semantic version tag (expected vMAJOR.MINOR.PATCH)" >&2
+              exit 1
+            fi
+            TAG_VER="${REF_NAME#v}"
+            if [ "$TAG_VER" != "$CARGO_VER" ]; then
+              echo "Tag version ($TAG_VER) does not match Cargo.toml workspace version ($CARGO_VER)" >&2
+              exit 1
+            fi
+            git fetch --no-tags origin main:refs/remotes/origin/main
+            if ! git merge-base --is-ancestor "$SHA" refs/remotes/origin/main; then
+              echo "Tagged commit $SHA is not on main" >&2
+              exit 1
+            fi
+            VERSION="$REF_NAME"
+          else
+            SHORT_SHA="${SHA:0:7}"
+            VERSION="v${CARGO_VER}-${SHORT_SHA}"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved artifact version: $VERSION"
+
+      - name: Install AVR GCC, ARM binutils, and Rust targets
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gcc-avr avr-libc binutils-avr
+          sudo apt-get install -y --no-install-recommends gcc-avr avr-libc binutils-avr binutils-arm-none-eabi
           rustup target add thumbv7em-none-eabihf
           rustup toolchain install nightly --profile minimal --component rust-src
 
@@ -58,15 +99,79 @@ jobs:
       - name: Test portable core
         run: cargo test -p mumen-core --target x86_64-unknown-linux-gnu
 
-      - name: Build Teensy 4.0 firmware (all layout features)
+      - name: Build Teensy 4.0 firmware (all layout features) and package .hex blobs
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
+          mkdir -p dist
           for layout in layout-standard layout-alternate layout-d16 layout-d16s layout-a4d17; do
             cargo build --release -p firmware-teensy40 --target thumbv7em-none-eabihf --no-default-features --features "$layout"
+            arm-none-eabi-objcopy -O ihex \
+              target/thumbv7em-none-eabihf/release/firmware-teensy40 \
+              "dist/mumen-teensy40-${VERSION}-${layout}.hex"
           done
 
-      - name: Build ATmega32U4 Pro Micro firmware (all layout features)
+      - name: Build ATmega32U4 Pro Micro firmware (all layout features) and package .hex blobs
         working-directory: crates/firmware-promicro
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           for layout in layout-promicro-standard layout-promicro-classic; do
             cargo +nightly build --release --no-default-features --features "$layout"
+            avr-objcopy -O ihex -R .eeprom \
+              ../../target/avr-none/release/firmware-promicro.elf \
+              "../../dist/mumen-promicro-${VERSION}-${layout}.hex"
           done
+
+      - name: Generate SHA256SUMS
+        run: |
+          cd dist
+          sha256sum *.hex > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload firmware release blobs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mumen-firmware-hex
+          if-no-files-found: error
+          path: |
+            dist/*.hex
+            dist/SHA256SUMS
+
+  release:
+    name: Publish GitHub release
+    needs:
+      - zizmor
+      - rust
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # needed for gh release create to publish tagged firmware blobs
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download firmware release blobs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mumen-firmware-hex
+          path: dist
+
+      - name: Publish versioned GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          PRE_FLAG=""
+          case "$TAG_NAME" in
+            *-*) PRE_FLAG="--prerelease" ;;
+          esac
+          gh release create "$TAG_NAME" \
+            --verify-tag \
+            --title "MumenController $TAG_NAME" \
+            --generate-notes \
+            $PRE_FLAG \
+            dist/*
